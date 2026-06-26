@@ -1,0 +1,39 @@
+{
+  "status": "success",
+  "query": "Looking for an AI Engineer with backend integration skills",
+  "processing_time_ms": 78,
+  "total_candidates": 5000,
+  "total_matches_found": 100,
+  "top_candidates": [
+    {
+      "candidate_id": "CAND-8932",
+      "rank": 1,
+      "name": "Arjun Sharma",
+      "match_score": 94.5,
+      "experience_years": 2,
+      "core_skills": ["Python", "FastAPI", "scikit-learn", "TensorFlow", "SQL"],
+      "matched_skills": ["Python", "FastAPI", "SQL"],
+      "reasoning": "Strong semantic match with the job description. Backend API development experience along with ML stack aligns well with the required profile."
+    },
+    {
+      "candidate_id": "CAND-4721",
+      "rank": 2,
+      "name": "Sarah Chen",
+      "match_score": 89.2,
+      "experience_years": 5,
+      "core_skills": ["Python", "FastAPI", "Docker", "PostgreSQL", "PyTorch", "Kubernetes"],
+      "matched_skills": ["Python", "FastAPI", "PostgreSQL"],
+      "reasoning": "Excellent backend integration skills with FastAPI and PostgreSQL. Extensive experience with cloud deployments and Python containerization."
+    },
+    {
+      "candidate_id": "CAND-1049",
+      "rank": 3,
+      "name": "Marcus de Vries",
+      "match_score": 85.0,
+      "experience_years": 4,
+      "core_skills": ["Python", "Django", "Flask", "SQL", "Pandas", "AWS"],
+      "matched_skills": ["Python", "SQL"],
+      "reasoning": "Solid Python backend foundations with SQL database design. Lacks FastAPI specific experience but has strong transferrable web frameworks knowledge."
+    }
+  ]
+}
