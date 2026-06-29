@@ -5,22 +5,22 @@
 # ============================================================================
 # Team identity
 # ============================================================================
-team_name: "India Runs"  # Replace with your registered team name if different
+team_name: "Sutra Collective"  
 
 primary_contact:
   name: "Harsh Verma"
-  email: "31316356+harsh-18@users.noreply.github.com"   # Replace with your primary contact email
-  phone: "+91-XXXXXXXXXX"                              # Replace with your phone number
+  email: "vharsh26@gmail.com"
+  phone: "+91-8292660801"        
 
 team_members:
   - name: "Harsh Verma"
-    email: "31316356+harsh-18@users.noreply.github.com"
+    email: "vharsh26@gmail.com"
     role: "Backend & Team Lead, Product Manager/Business Analyst"
   - name: "Vanshika"
-    email: "vanshika@example.com"                       # Replace with correct email
+    email: "vanshikavaidya655@gmail.com"                   
     role: "Frontend & Safety"
-  - name: "Swapna"
-    email: "swapna@example.com"                         # Replace with correct email
+  - name: "Sapna"
+    email: "sapnachoudhary8243@gmail.com"                    
     role: "Refiner & Ranking"
 
 # ============================================================================
@@ -51,12 +51,11 @@ compute:
 # AI tools declaration
 # ============================================================================
 ai_tools_used:
-  - "Claude"
   - "Gemini"
-  - "Cursor"
+  - "Anti-gravity"
 
 ai_usage_summary: |
-  Used Claude and Gemini for design, refactoring, and code review. Used Cursor and Python tools for debugging.
+  Used Gemini and Anti-gravity for design, refactoring, and code review.
   No candidate profile data was fed to any hosted LLM APIs during ranking or preprocessing.
 
 # ============================================================================
