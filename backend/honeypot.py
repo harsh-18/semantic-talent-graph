@@ -70,3 +70,21 @@ def calculate_honeypot_score(candidate):
 def is_honeypot(candidate):
 
     return calculate_honeypot_score(candidate) >= 40
+def remove_honeypots(processed_candidates):
+    """
+    Remove candidates identified as honeypots.
+    """
+
+    clean_candidates = []
+
+    for candidate in processed_candidates:
+
+        raw = candidate["raw_candidate"]
+
+        if not is_honeypot(raw):
+
+            clean_candidates.append(candidate)
+
+    print(f"Honeypots Removed: {len(processed_candidates) - len(clean_candidates)}")
+
+    return clean_candidates

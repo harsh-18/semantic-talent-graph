@@ -1,57 +1,106 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from models import SearchRequest
+
+from preprocess import (
+    load_candidates,
+    preprocess_candidates
+)
+
+from honeypot import remove_honeypots
+from ranking import rank_candidates
+
 
 app = FastAPI(
     title="Semantic Talent Graph API",
     version="1.0"
 )
 
+# ===================================================
+# Load everything once when server starts
+# ===================================================
 
-# --------------------------
-# Request Model
-# --------------------------
+print("\nLoading candidate dataset...")
 
-class SearchRequest(BaseModel):
-    query: str
+DATA_PATH = "data/candidates.jsonl"
+
+raw_candidates = load_candidates(DATA_PATH)
+
+processed_candidates = preprocess_candidates(raw_candidates)
+
+clean_candidates = remove_honeypots(processed_candidates)
+
+print(f"Backend Ready!")
+print(f"Candidates Loaded : {len(raw_candidates)}")
+print(f"Candidates After Cleaning : {len(clean_candidates)}")
 
 
-# --------------------------
-# Root Endpoint
-# --------------------------
+# ===================================================
+# Home Route
+# ===================================================
 
 @app.get("/")
 def home():
+
     return {
-        "message": "Semantic Talent Graph Backend Running!"
+        "status": "running",
+        "message": "Semantic Talent Graph Backend Running"
     }
 
 
-# --------------------------
+# ===================================================
 # Search Endpoint
-# --------------------------
+# ===================================================
 
 @app.post("/search")
-def search_candidates(request: SearchRequest):
+def search(request: SearchRequest):
 
-    dummy_response = {
-        "status": "success",
+    # Temporary ranking
+    ranked_candidates = rank_candidates(
+        clean_candidates,
+        request.query
+    )
+
+    results = []
+
+    for rank, candidate in enumerate(ranked_candidates[:10], start=1):
+
+        profile = candidate["raw_candidate"].get("profile", {})
+
+        results.append({
+
+            "candidate_id": candidate["candidate_id"],
+
+            "name": profile.get(
+                "anonymized_name",
+                "Unknown"
+            ),
+
+            "current_role": profile.get(
+                "current_title",
+                "N/A"
+            ),
+
+            "rank": rank,
+
+            "score": candidate["behavior_score"],
+
+            "behavior_score": candidate["behavior_score"],
+
+            "active": candidate["active"],
+
+            "honeypot": candidate["is_honeypot"],
+
+            "reasoning":
+                "Temporary ranking. TF-IDF integration pending."
+
+        })
+
+    return {
+
         "query": request.query,
-        "total_matches_found": 3,
-        "top_candidates": [
-            {
-                "candidate_id": "CAND_000001",
-                "name": "Dummy Candidate",
-                "match_score": 92.5,
-                "behavior_score": 88.1,
-                "honeypot": False,
-                "core_skills": [
-                    "Python",
-                    "FastAPI",
-                    "SQL"
-                ],
-                "reasoning": "Strong backend experience with Python and FastAPI."
-            }
-        ]
-    }
 
-    return dummy_response
+        "total_candidates": len(clean_candidates),
+
+        "results": results
+
+    }

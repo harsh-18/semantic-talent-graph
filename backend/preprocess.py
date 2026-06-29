@@ -1,26 +1,30 @@
 import json
 import re
 from docx import Document
+
 from behavior import extract_behavior
 from honeypot import (
     calculate_honeypot_score,
     is_honeypot
 )
 
-# --------------------------------------------------
+
+# ==================================================
 # Load Candidate Dataset
-# --------------------------------------------------
+# ==================================================
 
 def load_candidates(file_path):
     """
     Load candidates from JSONL file.
-    Returns a list of dictionaries.
+    Returns a list of candidate dictionaries.
     """
 
     candidates = []
 
     with open(file_path, "r", encoding="utf-8") as file:
+
         for line in file:
+
             line = line.strip()
 
             if line:
@@ -29,13 +33,13 @@ def load_candidates(file_path):
     return candidates
 
 
-# --------------------------------------------------
+# ==================================================
 # Load Job Description
-# --------------------------------------------------
+# ==================================================
 
 def load_job_description(doc_path):
     """
-    Load the recruiter job description from DOCX.
+    Read recruiter job description from DOCX.
     """
 
     document = Document(doc_path)
@@ -43,23 +47,20 @@ def load_job_description(doc_path):
     paragraphs = []
 
     for para in document.paragraphs:
+
         if para.text.strip():
             paragraphs.append(para.text)
 
     return "\n".join(paragraphs)
 
 
-# --------------------------------------------------
+# ==================================================
 # Text Cleaning
-# --------------------------------------------------
+# ==================================================
 
 def clean_text(text):
     """
     Clean text before TF-IDF.
-
-    - lowercase
-    - remove punctuation
-    - remove extra spaces
     """
 
     if text is None:
@@ -74,21 +75,21 @@ def clean_text(text):
     return text.strip()
 
 
-# --------------------------------------------------
-# Feature Engineering
-# --------------------------------------------------
+# ==================================================
+# Create Searchable Candidate Document
+# ==================================================
 
 def create_combined_text(candidate):
     """
-    Convert nested candidate profile into one clean
-    searchable document for TF-IDF.
+    Convert complete candidate profile into one
+    searchable document.
     """
 
     text_parts = []
 
-    # ----------------------------
+    # --------------------
     # Profile
-    # ----------------------------
+    # --------------------
 
     profile = candidate.get("profile", {})
 
@@ -100,9 +101,9 @@ def create_combined_text(candidate):
         profile.get("current_industry", "")
     ])
 
-    # ----------------------------
+    # --------------------
     # Career History
-    # ----------------------------
+    # --------------------
 
     for job in candidate.get("career_history", []):
 
@@ -113,9 +114,9 @@ def create_combined_text(candidate):
             job.get("industry", "")
         ])
 
-    # ----------------------------
+    # --------------------
     # Education
-    # ----------------------------
+    # --------------------
 
     for edu in candidate.get("education", []):
 
@@ -125,92 +126,159 @@ def create_combined_text(candidate):
             edu.get("field_of_study", "")
         ])
 
-    # ----------------------------
+    # --------------------
     # Skills
-    # ----------------------------
+    # --------------------
 
     for skill in candidate.get("skills", []):
 
-        text_parts.append(skill.get("name", ""))
+        text_parts.append(
+            skill.get("name", "")
+        )
 
-    # ----------------------------
+    # --------------------
     # Certifications
-    # ----------------------------
+    # --------------------
 
     for cert in candidate.get("certifications", []):
 
         if isinstance(cert, dict):
-            text_parts.append(cert.get("name", ""))
+
+            text_parts.append(
+                cert.get("name", "")
+            )
 
         else:
+
             text_parts.append(str(cert))
 
-    # ----------------------------
+    # --------------------
     # Languages
-    # ----------------------------
+    # --------------------
 
     for language in candidate.get("languages", []):
 
-        text_parts.append(language.get("language", ""))
+        text_parts.append(
+            language.get("language", "")
+        )
 
     combined_text = " ".join(text_parts)
 
     return clean_text(combined_text)
 
 
-# --------------------------------------------------
-# Extract Behavioral Signals
-# --------------------------------------------------
+# ==================================================
+# Extract Raw Behavioral Signals
+# ==================================================
 
 def extract_behavior_signals(candidate):
-    """
-    Extract Redrob behavioral metadata.
-    """
 
-    return candidate.get("redrob_signals", {})
-def preprocess_candidates(file_path):
-    """
-    Complete preprocessing pipeline.
+    return candidate.get(
+        "redrob_signals",
+        {}
+    )
 
-    Loads candidates, creates searchable text,
-    extracts behavioral signals, detects honeypots,
-    and returns processed candidates.
-    """
 
-    candidates = load_candidates(file_path)
+# ==================================================
+# Main Preprocessing Pipeline
+# ==================================================
+
+def preprocess_candidates(candidates):
+    """
+    Main preprocessing pipeline.
+
+    Generates:
+    - Combined Text
+    - Behavior Score
+    - Active Status
+    - Honeypot Score
+    """
 
     processed_candidates = []
 
     for candidate in candidates:
 
-        # Create searchable text
+        # --------------------
+        # Combined Text
+        # --------------------
+
         combined_text = create_combined_text(candidate)
 
-        # Extract behavior information
+        # --------------------
+        # Behavior Analysis
+        # --------------------
+
         behavior = extract_behavior(candidate)
 
-        # Honeypot detection
-        honeypot_score = calculate_honeypot_score(candidate)
+        # Down-weight inactive candidates
+
+        if not behavior["active"]:
+
+            behavior["behavior_score"] *= 0.70
+
+        behavior["behavior_score"] = round(
+            behavior["behavior_score"],
+            2
+        )
+
+        # --------------------
+        # Honeypot Analysis
+        # --------------------
+
+        honeypot_score = calculate_honeypot_score(
+            candidate
+        )
 
         processed_candidate = {
 
-            "candidate_id": candidate.get("candidate_id"),
+            "candidate_id":
+                candidate.get("candidate_id"),
 
-            "combined_text": combined_text,
+            "combined_text":
+                combined_text,
 
-            "behavior_score": behavior["behavior_score"],
+            "behavior_score":
+                behavior["behavior_score"],
 
-            "active": behavior["active"],
+            "active":
+                behavior["active"],
 
-            "behavior_signals": behavior["signals"],
+            "behavior_signals":
+                behavior["signals"],
 
-            "honeypot_score": honeypot_score,
+            "honeypot_score":
+                honeypot_score,
 
-            "is_honeypot": is_honeypot(candidate),
+            "is_honeypot":
+                is_honeypot(candidate),
 
-            "raw_candidate": candidate
+            "raw_candidate":
+                candidate
         }
 
-        processed_candidates.append(processed_candidate)
+        processed_candidates.append(
+            processed_candidate
+        )
 
     return processed_candidates
+
+
+# ==================================================
+# Testing
+# ==================================================
+
+if __name__ == "__main__":
+
+    DATA_PATH = "data/candidates.jsonl"
+
+    candidates = load_candidates(DATA_PATH)
+
+    processed = preprocess_candidates(candidates)
+
+    print("=" * 50)
+    print("Total Candidates :", len(processed))
+    print("=" * 50)
+
+    print("\nFirst Candidate\n")
+
+    print(processed[0])
