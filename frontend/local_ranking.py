@@ -203,7 +203,7 @@ def local_rank_candidates(
             "raw_candidate": raw
         })
         
-    ranked_list.sort(key=lambda x: x["match_score"], reverse=True)
+    ranked_list.sort(key=lambda x: (-x["match_score"], x["candidate_id"]))
     for rank_idx, item in enumerate(ranked_list):
         item["rank"] = rank_idx + 1
         

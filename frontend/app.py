@@ -236,6 +236,12 @@ if (search_btn or search_query) and candidates_source_path is not None:
                             "reasoning": res["reasoning"],
                             "raw_candidate": local_cand
                         })
+                    
+                    # Sort API results to enforce tie-breaking rule
+                    ranked_results.sort(key=lambda x: (-x["match_score"], x["candidate_id"]))
+                    for idx, item in enumerate(ranked_results):
+                        item["rank"] = idx + 1
+                        
                     api_success = True
                     st.sidebar.success("🟢 API Status: Connected (FastAPI backend)")
             except Exception:
