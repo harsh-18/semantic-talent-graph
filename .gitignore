@@ -1,0 +1,11 @@
+# Dataset
+backend/data/candidates.jsonl
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.env
+.vscode/
