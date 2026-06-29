@@ -122,3 +122,8 @@ data/raw/*
 
 # Vanshika's Hackathon Dataset (Crucial: Do not commit large files)
 backend/data/candidates.jsonl
+
+# Temporary files
+scratch/
+*.csv
+*.xlsx
