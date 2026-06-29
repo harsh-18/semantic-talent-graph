@@ -1,0 +1,76 @@
+# Redrob Hackathon — Submission Metadata
+#
+# Filled in for the Intelligent Candidate Discovery & Ranking Challenge.
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "India Runs"  # Replace with your registered team name if different
+
+primary_contact:
+  name: "Harsh Verma"
+  email: "31316356+harsh-18@users.noreply.github.com"   # Replace with your primary contact email
+  phone: "+91-XXXXXXXXXX"                              # Replace with your phone number
+
+team_members:
+  - name: "Harsh Verma"
+    email: "31316356+harsh-18@users.noreply.github.com"
+    role: "Backend & Team Lead, Product Manager/Business Analyst"
+  - name: "Vanshika"
+    email: "vanshika@example.com"                       # Replace with correct email
+    role: "Frontend & Safety"
+  - name: "Swapna"
+    email: "swapna@example.com"                         # Replace with correct email
+    role: "Refiner & Ranking"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/harsh-18/semantic-talent-graph"
+sandbox_link: "https://github.com/harsh-18/semantic-talent-graph"  # Replace with Streamlit Cloud or HF Space URL if hosted
+
+reproduce_command: "python rank.py --candidates ./backend/data/candidates.jsonl --out ./submission.csv"
+# The single command that produces submission.csv from candidates.jsonl.
+# Highly optimized line-by-line streaming parses the 500MB file on CPU in under 2 minutes.
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "Local Windows PC"
+  cpu_cores: 8
+  ram_gb: 16
+  python_version: "3.13.0"
+  os: "Windows 11"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: false
+  pre_computation_time_minutes: 0
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Claude"
+  - "Gemini"
+  - "Cursor"
+
+ai_usage_summary: |
+  Used Claude and Gemini for design, refactoring, and code review. Used Cursor and Python tools for debugging.
+  No candidate profile data was fed to any hosted LLM APIs during ranking or preprocessing.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  High-dimensional TF-IDF vectorization and cosine similarity Refiner combined with Redrob behavioral signal scoring (completeness, github commits, response rate) and multi-point honeypot anomaly detection. Custom tie-breaking logic resolves equal scores by candidate ID in ascending order. Optimized line-by-line parsing processes 100K candidates (~500MB) on local CPU under 2 minutes.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true
