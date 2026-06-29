@@ -1,11 +1,124 @@
-# Dataset
-backend/data/candidates.jsonl
-
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
 
-# Virtual Environment
-venv/
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nosexy
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Environments
 .env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE settings
 .vscode/
+.spyderproject
+.spyproject
+.ropeproject
+
+# mkdocs documentation
+/site/
+
+# mypy & type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Project-specific (Harsh & Vanshika Combined) ---
+# Raw data csv/json drops
+data/raw/*
+!data/raw/.gitkeep
+
+# Vanshika's Hackathon Dataset (Crucial: Do not commit large files)
+backend/data/candidates.jsonl
