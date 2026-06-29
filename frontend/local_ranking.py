@@ -7,20 +7,29 @@ from sklearn.metrics.pairwise import cosine_similarity
 def local_load_candidates(file_path: str) -> List[Dict[str, Any]]:
     """
     Load candidates from JSON or JSONL file.
-    Returns a list of candidate dictionaries.
+    Returns a list of candidate dictionaries. Highly memory-efficient.
     """
-    candidates = []
+    # 1. Peek at the first character to determine format
     with open(file_path, "r", encoding="utf-8") as file:
-        content = file.read().strip()
-        if content.startswith("["):
+        try:
+            first_char = file.read(1).strip()
+        except Exception:
+            first_char = ""
+            
+    # 2. If it's a JSON array, load the entire file
+    if first_char == "[":
+        with open(file_path, "r", encoding="utf-8") as file:
             try:
-                candidates = json.loads(content)
-                return candidates
+                import json
+                return json.load(file)
             except Exception:
                 pass
-        
-        # Parse as JSONL
-        for line in content.splitlines():
+                
+    # 3. Otherwise, parse as JSONL line-by-line to avoid loading full file content into memory
+    candidates = []
+    import json
+    with open(file_path, "r", encoding="utf-8") as file:
+        for line in file:
             line = line.strip()
             if line:
                 try:
