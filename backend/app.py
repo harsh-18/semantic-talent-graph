@@ -54,7 +54,7 @@ def home():
 @app.post("/search")
 def search(request: SearchRequest):
 
-    # Temporary ranking
+    # Rank candidates using TF-IDF ranking pipeline
     ranked_candidates = rank_candidates(
         clean_candidates,
         request.query
@@ -82,7 +82,7 @@ def search(request: SearchRequest):
 
             "rank": rank,
 
-            "score": candidate["behavior_score"],
+            "score": candidate.get("match_score", candidate["behavior_score"]),
 
             "behavior_score": candidate["behavior_score"],
 
@@ -90,8 +90,7 @@ def search(request: SearchRequest):
 
             "honeypot": candidate["is_honeypot"],
 
-            "reasoning":
-                "Temporary ranking. TF-IDF integration pending."
+            "reasoning": candidate.get("reasoning", "TF-IDF matching candidate profile.")
 
         })
 
