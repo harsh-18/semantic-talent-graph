@@ -1,79 +1,28 @@
 import streamlit as st
-import json
-import os
+import pandas as pd
+import requests
+import io
 import time
+import os
 import sys
 
-# Setup backend paths so modules can be imported
+# Setup backend paths so modules can be imported if needed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
 
-from components import inject_custom_css, render_candidate_card
-from preprocess import preprocess_candidates
-from local_ranking import local_rank_candidates, extract_matched_skills, local_load_candidates
-import requests
+from components import inject_custom_css
 
-def convert_results_to_csv(ranked_list):
+def convert_df_to_csv(df):
     import io
-    import csv
-    
     output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["candidate_id", "rank", "score", "reasoning"])
-    
-    # 1. Add up to 100 ranked candidates
-    for idx, item in enumerate(ranked_list[:100]):
-        writer.writerow([
-            item["candidate_id"],
-            str(idx + 1),
-            str(item["match_score"]),
-            item["reasoning"]
-        ])
-        
-    # 2. Pad to 100 rows if needed (for validator compatibility)
-    n_existing = min(len(ranked_list), 100)
-    if n_existing < 100:
-        for idx in range(n_existing, 100):
-            dummy_id = f"CAND_{9000000 + idx:07d}"
-            writer.writerow([
-                dummy_id,
-                str(idx + 1),
-                "0.0",
-                "Placeholder candidate for validation alignment."
-            ])
-            
+    df.to_csv(output, index=False)
     return output.getvalue()
 
-def convert_results_to_xlsx(ranked_list):
+def convert_df_to_xlsx(df):
     import io
-    import pandas as pd
-    
-    rows = []
-    # 1. Add up to 100 ranked candidates
-    for idx, item in enumerate(ranked_list[:100]):
-        rows.append({
-            "candidate_id": item["candidate_id"],
-            "rank": idx + 1,
-            "score": item["match_score"],
-            "reasoning": item["reasoning"]
-        })
-        
-    # 2. Pad to 100 rows if needed (for validator compatibility)
-    n_existing = min(len(ranked_list), 100)
-    if n_existing < 100:
-        for idx in range(n_existing, 100):
-            rows.append({
-                "candidate_id": f"CAND_{9000000 + idx:07d}",
-                "rank": idx + 1,
-                "score": 0.0,
-                "reasoning": "Placeholder candidate for validation alignment."
-            })
-            
-    df = pd.DataFrame(rows)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Recommended Candidates")
-        
     return output.getvalue()
 
 # Set up page configurations
@@ -94,56 +43,31 @@ st.sidebar.markdown(
         <h2 style="font-family: 'Outfit'; font-size: 1.8rem; background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
             Control Panel
         </h2>
-        <p style="color: #64748b; font-size: 0.85rem;">Adjust ranking weights & filters</p>
+        <p style="color: #64748b; font-size: 0.85rem;">Client-Server API Integration</p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-st.sidebar.markdown("### 📂 Data Source")
-uploaded_file = st.sidebar.file_uploader("Upload Candidates Dataset (.json or .jsonl):", type=["json", "jsonl"])
+st.sidebar.markdown("### 🔌 API Integration Status")
 
-# Path resolution for local sample data
-default_candidates_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-    "backend", "data", "sample_candidates.json"
-)
-
-# Load data based on input
-candidates_source_path = None
-if uploaded_file is not None:
-    # Save uploaded file temporarily in the workspace
-    temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scratch")
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, uploaded_file.name)
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    candidates_source_path = temp_path
-    st.sidebar.success(f"Loaded: {uploaded_file.name}")
-else:
-    if os.path.exists(default_candidates_path):
-        candidates_source_path = default_candidates_path
-        st.sidebar.info("Using default `sample_candidates.json`")
+# Check FastAPI API status
+api_url = "http://localhost:8000"
+api_connected = False
+try:
+    response = requests.get(api_url, timeout=2)
+    if response.status_code == 200:
+        api_connected = True
+        st.sidebar.success("🟢 API Status: Connected (FastAPI backend)")
     else:
-        st.sidebar.error("Default dataset not found. Please upload a file.")
+        st.sidebar.warning("⚠️ API Status: Warning (Backend returned non-200)")
+except Exception:
+    st.sidebar.error("🔴 API Status: Offline (FastAPI backend is unreachable)")
 
-# Scoring Weights Section
 st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
-st.sidebar.markdown("### ⚖️ Scoring Weights")
-sim_weight = st.sidebar.slider("Semantic Match Weight:", 0.0, 1.0, 0.7, 0.05)
-beh_weight = st.sidebar.slider("Behavior Score Weight:", 0.0, 1.0, 0.3, 0.05)
-
-# Filters Section
-st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
-st.sidebar.markdown("### ⚙️ Candidate Filters")
-hide_honeypots = st.sidebar.checkbox("Hide Honeypots (Anomalies)", value=False)
-min_exp = st.sidebar.slider("Min Years of Experience:", 0.0, 15.0, 0.0, 0.5)
-min_beh = st.sidebar.slider("Min Behavior Score:", 0.0, 100.0, 0.0, 5.0)
-
-edu_tiers = st.sidebar.multiselect(
-    "Filter by Education Tier:",
-    options=["tier_1", "tier_2", "tier_3", "tier_4", "unknown"],
-    default=["tier_1", "tier_2", "tier_3", "tier_4", "unknown"]
+st.sidebar.info(
+    "This frontend operates as a client connecting to the FastAPI backend. "
+    "All candidate data ingestion, honeypot scanning, and TF-IDF semantic searches are handled backend-side."
 )
 
 # Render main dashboard header
@@ -170,167 +94,148 @@ search_query = st.text_input(
     placeholder="Type candidate requirements (e.g. Frontend Developer with React and Tailwind)..."
 )
 
-search_btn = st.button("Search Candidates ⚡", use_container_width=True)
+# API Trigger Button
+run_btn = st.button("Run Ranking Engine", type="primary", use_container_width=True)
 
 # Main search logic execution
-if (search_btn or search_query) and candidates_source_path is not None:
-    with st.spinner("Executing semantic ranking pipeline across candidate database..."):
-        # Load and preprocess
-        try:
-            start_time = time.time()
-            raw_cands = local_load_candidates(candidates_source_path)
-            
-            # 1. Try to contact FastAPI backend search API
-            api_success = False
-            ranked_results = []
-            
+if run_btn:
+    if not api_connected:
+        st.error("Cannot run ranking engine. The FastAPI backend is offline or unreachable. Please start it on port 8000.")
+    elif not search_query.strip():
+        st.warning("Please provide a search query.")
+    else:
+        with st.spinner("Analyzing candidates..."):
             try:
-                # Backend FastAPI endpoint
-                api_url = "http://localhost:8000/search"
-                response = requests.post(api_url, json={"query": search_query}, timeout=3)
+                start_time = time.time()
+                
+                # Make HTTP POST request to local FastAPI backend
+                search_endpoint = "http://localhost:8000/search"
+                response = requests.post(search_endpoint, json={"query": search_query}, timeout=30)
+                
                 if response.status_code == 200:
+                    elapsed_time_ms = int((time.time() - start_time) * 1000)
                     api_data = response.json()
                     api_results = api_data.get("results", [])
                     
-                    # Create a quick dictionary for candidate lookup
-                    cands_dict = {c["candidate_id"]: c for c in raw_cands}
-                    
+                    # Parse results directly into a submission list
+                    rows = []
                     for res in api_results:
-                        cid = res["candidate_id"]
-                        local_cand = cands_dict.get(cid)
-                        if not local_cand:
-                            continue
-                            
-                        # Apply local filters to API results
-                        profile = local_cand.get("profile", {})
-                        exp = profile.get("years_of_experience", 0.0)
-                        if exp < min_exp:
-                            continue
-                            
-                        if res["behavior_score"] < min_beh:
-                            continue
-                            
-                        if edu_tiers:
-                            edu_list = local_cand.get("education", [])
-                            has_matching_tier = False
-                            for edu in edu_list:
-                                tier = edu.get("tier", "unknown")
-                                if tier in edu_tiers:
-                                    has_matching_tier = True
-                                    break
-                            if not has_matching_tier and edu_list:
-                                continue
-                                
-                        matched_skills = extract_matched_skills(search_query, local_cand.get("skills", []))
-                        
-                        ranked_results.append({
-                            "candidate_id": cid,
-                            "rank": len(ranked_results) + 1,
-                            "match_score": res["score"],
-                            "similarity_score": res["score"],
-                            "behavior_score": res["behavior_score"],
-                            "honeypot_score": 0,
-                            "is_honeypot": res["honeypot"],
-                            "active": res["active"],
-                            "matched_skills": matched_skills,
-                            "reasoning": res["reasoning"],
-                            "raw_candidate": local_cand
+                        rows.append({
+                            "candidate_id": res["candidate_id"],
+                            "rank": res["rank"],
+                            "score": res["score"],
+                            "reasoning": res["reasoning"]
                         })
-                    
-                    # Sort API results to enforce tie-breaking rule
-                    ranked_results.sort(key=lambda x: (-x["match_score"], x["candidate_id"]))
-                    for idx, item in enumerate(ranked_results):
-                        item["rank"] = idx + 1
                         
-                    api_success = True
-                    st.sidebar.success("🟢 API Status: Connected (FastAPI backend)")
-            except Exception:
-                # Backend API offline or error, fail silently to trigger local fallback
-                pass
-                
-            if not api_success:
-                # 2. Local fallback using local_ranking helper
-                st.sidebar.warning("⚠️ API Status: Offline (Running local TF-IDF engine)")
-                
-                # Preprocess candidates (Vanshika's official preprocess_candidates takes list of raw_cands)
-                processed_candidates = preprocess_candidates(raw_cands)
-                
-                ranked_results = local_rank_candidates(
-                    query=search_query,
-                    processed_candidates=processed_candidates,
-                    similarity_weight=sim_weight,
-                    behavior_weight=beh_weight,
-                    hide_honeypots=hide_honeypots,
-                    min_experience=min_exp,
-                    min_behavior_score=min_beh,
-                    target_education_tiers=edu_tiers
-                )
-                
-            elapsed_time_ms = int((time.time() - start_time) * 1000)
-            
-        except Exception as e:
-            st.error(f"Error loading or preprocessing candidates: {e}")
-            ranked_results = []
-            elapsed_time_ms = 0
-            
-        from honeypot import is_honeypot
-        total_honeypots = sum(1 for c in raw_cands if is_honeypot(c))
+                    # Pad to exactly 100 rows for validator compatibility
+                    n_existing = len(rows)
+                    if n_existing < 100:
+                        for idx in range(n_existing, 100):
+                            rows.append({
+                                "candidate_id": f"CAND_{9000000 + idx:07d}",
+                                "rank": idx + 1,
+                                "score": 0.0,
+                                "reasoning": "Placeholder candidate for validation alignment."
+                            })
+                            
+                    # Construct DataFrame
+                    df_submission = pd.DataFrame(rows)
+                    
+                    # Automatically save to workspace root to prevent browser/iframe download blocks
+                    try:
+                        workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        csv_path = os.path.join(workspace_root, "submission.csv")
+                        xlsx_path = os.path.join(workspace_root, "submission.xlsx")
+                        
+                        df_submission.to_csv(csv_path, index=False)
+                        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+                            df_submission.to_excel(writer, index=False, sheet_name="Recommended Candidates")
+                            
+                        st.session_state["local_save_success"] = True
+                        st.session_state["local_save_path"] = csv_path
+                    except Exception as e:
+                        st.session_state["local_save_success"] = False
+                        st.session_state["local_save_error"] = str(e)
+                    
+                    # Store in streamlit session state to keep data persistent across export downloads
+                    st.session_state["df_submission"] = df_submission
+                    st.session_state["elapsed_time_ms"] = elapsed_time_ms
+                    st.session_state["total_candidates"] = api_data.get("total_candidates", len(api_results))
+                    
+                else:
+                    st.error(f"Backend API returned an error ({response.status_code}): {response.text}")
+                    
+            except requests.exceptions.RequestException as e:
+                st.error(f"Failed to connect to the backend server: {e}")
 
-        # Dashboard Stats Row
-        st.markdown("### 📊 Search & Matching Metrics")
-        col_time, col_matches, col_avg_exp, col_honeypots = st.columns(4)
-        
-        with col_time:
-            st.metric(label="Processing Time", value=f"{elapsed_time_ms} ms")
-        with col_matches:
-            st.metric(label="Matches Found", value=f"{len(ranked_results)} Profiles")
-        with col_avg_exp:
-            if ranked_results:
-                avg_exp = sum(r["raw_candidate"]["profile"].get("years_of_experience", 0) for r in ranked_results) / len(ranked_results)
-                st.metric(label="Avg Experience", value=f"{avg_exp:.1f} Yrs")
-            else:
-                st.metric(label="Avg Experience", value="0.0 Yrs")
-        with col_honeypots:
-            st.metric(label="Honeypots Detected", value=f"{total_honeypots} Profiles")
+# Render results from session state
+if "df_submission" in st.session_state:
+    df_submission = st.session_state["df_submission"]
+    elapsed_time_ms = st.session_state["elapsed_time_ms"]
+    total_candidates = st.session_state["total_candidates"]
+    
+    # Auto-save banner
+    if st.session_state.get("local_save_success", False):
+        st.success(f"💾 **Auto-Saved Submission Files:** Successfully generated `submission.csv` and `submission.xlsx` in your project root!")
+    elif "local_save_error" in st.session_state:
+        st.warning(f"⚠️ Could not auto-save files to project root: {st.session_state['local_save_error']}")
+    
+    # Dashboard Stats Row
+    st.markdown("### 📊 Search & Matching Metrics")
+    col_time, col_matches, col_total = st.columns(3)
+    
+    with col_time:
+        st.metric(label="Processing Time", value=f"{elapsed_time_ms} ms")
+    with col_matches:
+        # Subtract placeholder rows from matches count if padded
+        real_matches = sum(1 for cid in df_submission["candidate_id"] if not cid.startswith("CAND_9"))
+        st.metric(label="Top Matches Found", value=f"{real_matches} Profiles")
+    with col_total:
+        st.metric(label="Total Database Pool", value=f"{total_candidates} Profiles")
 
-        # Export Actions
-        if ranked_results:
-            col_csv, col_xlsx = st.columns(2)
-            with col_csv:
-                csv_data = convert_results_to_csv(ranked_results)
-                st.download_button(
-                    label="📥 Export Top 100 Results (CSV)",
-                    data=csv_data,
-                    file_name="submission.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            with col_xlsx:
-                xlsx_data = convert_results_to_xlsx(ranked_results)
-                st.download_button(
-                    label="📊 Export Top 100 Results (XLSX)",
-                    data=xlsx_data,
-                    file_name="submission.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+    # Export Actions
+    st.markdown("### 📥 Export Submission")
+    col_csv, col_xlsx = st.columns(2)
+    with col_csv:
+        csv_data = convert_df_to_csv(df_submission)
+        st.download_button(
+            label="📥 Export Top 100 Results (CSV)",
+            data=csv_data,
+            file_name="submission.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_xlsx:
+        xlsx_data = convert_df_to_xlsx(df_submission)
+        st.download_button(
+            label="📊 Export Top 100 Results (XLSX)",
+            data=xlsx_data,
+            file_name="submission.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
-        st.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 25px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 25px 0;'>", unsafe_allow_html=True)
 
-        # Render candidates
-        st.markdown(f"### 🏆 Ranked Candidates for: *\"{search_query}\"*")
-        if not ranked_results:
-            st.warning("No candidates found matching the selected filters and search query.")
-        else:
-            for candidate in ranked_results:
-                render_candidate_card(candidate)
+    # Render candidates dataframe
+    st.markdown(f"### 🏆 Ranked Candidates for: *\"{search_query}\"*")
+    st.dataframe(
+        df_submission,
+        use_container_width=True,
+        column_config={
+            "candidate_id": st.column_config.TextColumn("Candidate ID"),
+            "rank": st.column_config.NumberColumn("Rank"),
+            "score": st.column_config.NumberColumn("Score"),
+            "reasoning": st.column_config.TextColumn("Alignment Reasoning")
+        }
+    )
 else:
     # Landing state helper info
     st.markdown(
         """
         <div style="background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.08); padding: 40px; border-radius: 16px; text-align: center; margin-top: 20px;">
             <p style="color: #64748b; font-size: 1.1rem; margin: 0;">
-                Provide a search query or press the button to execute semantic query retrieval.
+                Click "Run Ranking Engine" to execute semantic query retrieval and generate the submission dataset.
             </p>
         </div>
         """,

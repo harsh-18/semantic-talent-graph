@@ -62,7 +62,7 @@ def search(request: SearchRequest):
 
     results = []
 
-    for rank, candidate in enumerate(ranked_candidates[:10], start=1):
+    for rank, candidate in enumerate(ranked_candidates[:100], start=1):
 
         profile = candidate["raw_candidate"].get("profile", {})
 
