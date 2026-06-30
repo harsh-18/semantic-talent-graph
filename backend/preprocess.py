@@ -15,21 +15,52 @@ from honeypot import (
 
 def load_candidates(file_path):
     """
-    Load candidates from JSONL file.
-    Returns a list of candidate dictionaries.
+    Load candidates from JSON or JSONL file.
+    Supports fallbacks and handles large datasets.
     """
+    import os
+    import json
 
-    candidates = []
+    # Fallback checks
+    if not os.path.exists(file_path):
+        dir_name = os.path.dirname(file_path)
+        base_name = os.path.basename(file_path)
+        
+        # If looking for candidates.jsonl but not found, try sample_candidates.json
+        if "candidates.jsonl" in base_name:
+            fallback_path = os.path.join(dir_name if dir_name else "data", "sample_candidates.json")
+            if os.path.exists(fallback_path):
+                file_path = fallback_path
+            elif os.path.exists("backend/data/sample_candidates.json"):
+                file_path = "backend/data/sample_candidates.json"
+            elif os.path.exists("data/sample_candidates.json"):
+                file_path = "data/sample_candidates.json"
+        
+        # If file_path still does not exist, throw FileNotFoundError
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Could not find candidate data file at {file_path}")
 
+    # Peek at first non-whitespace char to detect JSON array vs JSONL
     with open(file_path, "r", encoding="utf-8") as file:
-
+        first_char = ""
         for line in file:
+            line_s = line.strip()
+            if line_s:
+                first_char = line_s[0]
+                break
 
+    # If JSON array
+    if first_char == "[":
+        with open(file_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    # If JSONL
+    candidates = []
+    with open(file_path, "r", encoding="utf-8") as file:
+        for line in file:
             line = line.strip()
-
             if line:
                 candidates.append(json.loads(line))
-
     return candidates
 
 
