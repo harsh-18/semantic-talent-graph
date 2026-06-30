@@ -2,6 +2,8 @@
 
 AI-powered semantic candidate discovery, ranking, and verification system built for the India Runs x Redrob Hackathon.
 
+🚀 **Live Streamlit App:** [semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app](https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/)
+
 Semantic Talent Graph allows recruiters to execute high-dimensional semantic search queries against candidate profile pools. The system automatically computes platform engagement metrics (Behavioral Signal Score), filters/flags fraudulent profiles (Honeypot Anomaly Detection), and scores candidates based on a weighted combination of semantic relevance and engagement.
 
 ---

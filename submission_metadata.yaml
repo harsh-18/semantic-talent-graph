@@ -27,7 +27,7 @@ team_members:
 # Code and reproducibility
 # ============================================================================
 github_repo: "https://github.com/harsh-18/semantic-talent-graph"
-sandbox_link: "https://github.com/harsh-18/semantic-talent-graph"  # Replace with Streamlit Cloud or HF Space URL if hosted
+sandbox_link: "https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/"
 
 reproduce_command: "python rank.py --candidates ./backend/data/candidates.jsonl --out ./submission.csv"
 # The single command that produces submission.csv from candidates.jsonl.

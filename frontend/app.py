@@ -11,6 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
 
 from components import inject_custom_css
+from preprocess import preprocess_candidates
+from local_ranking import local_rank_candidates, local_load_candidates
 
 def convert_df_to_csv(df):
     import io
@@ -24,6 +26,29 @@ def convert_df_to_xlsx(df):
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Recommended Candidates")
     return output.getvalue()
+
+def format_and_pad_results(ranked_list):
+    rows = []
+    # 1. Take up to 100 candidates
+    for idx, item in enumerate(ranked_list[:100]):
+        rows.append({
+            "candidate_id": item["candidate_id"],
+            "rank": idx + 1,
+            "score": item.get("match_score", item.get("score", 0.0)),
+            "reasoning": item.get("reasoning", "TF-IDF matching candidate profile.")
+        })
+        
+    # 2. Pad to 100 rows if needed (for validator compatibility)
+    n_existing = len(rows)
+    if n_existing < 100:
+        for idx in range(n_existing, 100):
+            rows.append({
+                "candidate_id": f"CAND_{9000000 + idx:07d}",
+                "rank": idx + 1,
+                "score": 0.0,
+                "reasoning": "Placeholder candidate for validation alignment."
+            })
+    return pd.DataFrame(rows)
 
 # Set up page configurations
 st.set_page_config(
@@ -43,7 +68,7 @@ st.sidebar.markdown(
         <h2 style="font-family: 'Outfit'; font-size: 1.8rem; background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
             Control Panel
         </h2>
-        <p style="color: #64748b; font-size: 0.85rem;">Client-Server API Integration</p>
+        <p style="color: #64748b; font-size: 0.85rem;">Client-Server Integration</p>
     </div>
     """,
     unsafe_allow_html=True
@@ -62,12 +87,53 @@ try:
     else:
         st.sidebar.warning("⚠️ API Status: Warning (Backend returned non-200)")
 except Exception:
-    st.sidebar.error("🔴 API Status: Offline (FastAPI backend is unreachable)")
+    st.sidebar.warning("⚠️ API Status: Offline (Running in Local Fallback mode)")
 
+# Sidebar File Uploader and Parameters (Always show or show when API is offline)
 st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
-st.sidebar.info(
-    "This frontend operates as a client connecting to the FastAPI backend. "
-    "All candidate data ingestion, honeypot scanning, and TF-IDF semantic searches are handled backend-side."
+st.sidebar.markdown("### 📂 Standalone Data Source")
+uploaded_file = st.sidebar.file_uploader("Upload Candidates Dataset (.json or .jsonl):", type=["json", "jsonl"])
+
+# Path resolution for local sample data
+default_candidates_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+    "backend", "data", "sample_candidates.json"
+)
+
+# Load data based on input
+candidates_source_path = None
+if uploaded_file is not None:
+    temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scratch")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, uploaded_file.name)
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    candidates_source_path = temp_path
+    st.sidebar.success(f"Loaded: {uploaded_file.name}")
+else:
+    if os.path.exists(default_candidates_path):
+        candidates_source_path = default_candidates_path
+        st.sidebar.info("Using default `sample_candidates.json`")
+    else:
+        st.sidebar.error("Default dataset not found. Please upload a file.")
+
+# Scoring Weights Section
+st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("### ⚖️ Local Engine Scoring Weights")
+sim_weight = st.sidebar.slider("Semantic Match Weight:", 0.0, 1.0, 0.7, 0.05)
+beh_weight = st.sidebar.slider("Behavior Score Weight:", 0.0, 1.0, 0.3, 0.05)
+
+# Filters Section
+st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("### ⚙️ Local Engine Candidate Filters")
+hide_honeypots = st.sidebar.checkbox("Hide Honeypots (Anomalies)", value=False)
+min_exp = st.sidebar.slider("Min Years of Experience:", 0.0, 15.0, 0.0, 0.5)
+min_beh = st.sidebar.slider("Min Behavior Score:", 0.0, 100.0, 0.0, 5.0)
+
+edu_tiers = st.sidebar.multiselect(
+    "Filter by Education Tier:",
+    options=["tier_1", "tier_2", "tier_3", "tier_4", "unknown"],
+    default=["tier_1", "tier_2", "tier_3", "tier_4", "unknown"]
 )
 
 # Render main dashboard header
@@ -99,74 +165,79 @@ run_btn = st.button("Run Ranking Engine", type="primary", use_container_width=Tr
 
 # Main search logic execution
 if run_btn:
-    if not api_connected:
-        st.error("Cannot run ranking engine. The FastAPI backend is offline or unreachable. Please start it on port 8000.")
-    elif not search_query.strip():
+    if not search_query.strip():
         st.warning("Please provide a search query.")
     else:
         with st.spinner("Analyzing candidates..."):
-            try:
-                start_time = time.time()
-                
-                # Make HTTP POST request to local FastAPI backend
-                search_endpoint = "http://localhost:8000/search"
-                response = requests.post(search_endpoint, json={"query": search_query}, timeout=30)
-                
-                if response.status_code == 200:
-                    elapsed_time_ms = int((time.time() - start_time) * 1000)
-                    api_data = response.json()
-                    api_results = api_data.get("results", [])
+            start_time = time.time()
+            df_submission = None
+            total_candidates = 0
+            
+            # --- Path A: FastAPI Backend (if online) ---
+            if api_connected:
+                try:
+                    search_endpoint = "http://localhost:8000/search"
+                    response = requests.post(search_endpoint, json={"query": search_query}, timeout=30)
                     
-                    # Parse results directly into a submission list
-                    rows = []
-                    for res in api_results:
-                        rows.append({
-                            "candidate_id": res["candidate_id"],
-                            "rank": res["rank"],
-                            "score": res["score"],
-                            "reasoning": res["reasoning"]
-                        })
-                        
-                    # Pad to exactly 100 rows for validator compatibility
-                    n_existing = len(rows)
-                    if n_existing < 100:
-                        for idx in range(n_existing, 100):
-                            rows.append({
-                                "candidate_id": f"CAND_{9000000 + idx:07d}",
-                                "rank": idx + 1,
-                                "score": 0.0,
-                                "reasoning": "Placeholder candidate for validation alignment."
-                            })
-                            
-                    # Construct DataFrame
-                    df_submission = pd.DataFrame(rows)
-                    
-                    # Automatically save to workspace root to prevent browser/iframe download blocks
-                    try:
-                        workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                        csv_path = os.path.join(workspace_root, "submission.csv")
-                        xlsx_path = os.path.join(workspace_root, "submission.xlsx")
-                        
-                        df_submission.to_csv(csv_path, index=False)
-                        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
-                            df_submission.to_excel(writer, index=False, sheet_name="Recommended Candidates")
-                            
-                        st.session_state["local_save_success"] = True
-                        st.session_state["local_save_path"] = csv_path
-                    except Exception as e:
-                        st.session_state["local_save_success"] = False
-                        st.session_state["local_save_error"] = str(e)
-                    
-                    # Store in streamlit session state to keep data persistent across export downloads
-                    st.session_state["df_submission"] = df_submission
-                    st.session_state["elapsed_time_ms"] = elapsed_time_ms
-                    st.session_state["total_candidates"] = api_data.get("total_candidates", len(api_results))
-                    
+                    if response.status_code == 200:
+                        api_data = response.json()
+                        api_results = api_data.get("results", [])
+                        df_submission = format_and_pad_results(api_results)
+                        total_candidates = api_data.get("total_candidates", len(api_results))
+                    else:
+                        st.error(f"Backend API returned an error ({response.status_code}): {response.text}")
+                except Exception as e:
+                    st.error(f"Failed to connect to the backend server: {e}")
+            
+            # --- Path B: Standalone Local Fallback Engine (if API offline) ---
+            if df_submission is None:
+                if candidates_source_path is None:
+                    st.error("Cannot run ranking. No candidate dataset loaded locally and API is offline.")
                 else:
-                    st.error(f"Backend API returned an error ({response.status_code}): {response.text}")
+                    try:
+                        raw_cands = local_load_candidates(candidates_source_path)
+                        total_candidates = len(raw_cands)
+                        
+                        # Preprocess
+                        processed_candidates = preprocess_candidates(raw_cands)
+                        
+                        # Rank
+                        ranked_results = local_rank_candidates(
+                            query=search_query,
+                            processed_candidates=processed_candidates,
+                            similarity_weight=sim_weight,
+                            behavior_weight=beh_weight,
+                            hide_honeypots=hide_honeypots,
+                            min_experience=min_exp,
+                            min_behavior_score=min_beh,
+                            target_education_tiers=edu_tiers
+                        )
+                        df_submission = format_and_pad_results(ranked_results)
+                    except Exception as e:
+                        st.error(f"Error executing local ranking engine: {e}")
+            
+            # If search succeeded (either via API or Local Fallback)
+            if df_submission is not None:
+                elapsed_time_ms = int((time.time() - start_time) * 1000)
+                
+                # Automatically save files to the project root directory
+                try:
+                    workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    csv_path = os.path.join(workspace_root, "submission.csv")
+                    xlsx_path = os.path.join(workspace_root, "submission.xlsx")
                     
-            except requests.exceptions.RequestException as e:
-                st.error(f"Failed to connect to the backend server: {e}")
+                    df_submission.to_csv(csv_path, index=False)
+                    with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+                        df_submission.to_excel(writer, index=False, sheet_name="Recommended Candidates")
+                        
+                    st.session_state["local_save_success"] = True
+                except Exception as e:
+                    st.session_state["local_save_success"] = False
+                    st.session_state["local_save_error"] = str(e)
+                    
+                st.session_state["df_submission"] = df_submission
+                st.session_state["elapsed_time_ms"] = elapsed_time_ms
+                st.session_state["total_candidates"] = total_candidates
 
 # Render results from session state
 if "df_submission" in st.session_state:
@@ -187,7 +258,6 @@ if "df_submission" in st.session_state:
     with col_time:
         st.metric(label="Processing Time", value=f"{elapsed_time_ms} ms")
     with col_matches:
-        # Subtract placeholder rows from matches count if padded
         real_matches = sum(1 for cid in df_submission["candidate_id"] if not cid.startswith("CAND_9"))
         st.metric(label="Top Matches Found", value=f"{real_matches} Profiles")
     with col_total:
