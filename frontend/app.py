@@ -77,7 +77,11 @@ st.sidebar.markdown(
 st.sidebar.markdown("### 🔌 API Integration Status")
 
 # Check FastAPI API status
-api_url = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+api_url = "http://localhost:8000"
+if "BACKEND_API_URL" in st.secrets:
+    api_url = st.secrets["BACKEND_API_URL"]
+else:
+    api_url = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 api_connected = False
 try:
     response = requests.get(api_url, timeout=2)
