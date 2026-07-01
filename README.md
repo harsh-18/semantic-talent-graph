@@ -78,7 +78,7 @@ Responsible for loading the raw database and computing safety/trust scores:
 Bridges backend parsing and frontend search queries:
 * **Vectorization (`ranking.py`):** Fits a TF-IDF vectorizer over the corpus of cleaned text and transforms search terms.
 * **Matching:** Evaluates cosine similarity of vectors to find true conceptual relevance.
-* **Adjustment:** Combines semantic scores with behavioral scores and provides dynamic reasoning text explaining the candidate's alignment.
+* **Adjustment & Alignment:** Combines semantic similarity (70% weight) and behavioral engagement (30% weight), scaling the final composite score to the `[0.0, 1.0]` range with 4 decimal places for challenge spec compliance (with top candidates scoring near 0.8). Supports lexicographical tie-breaking on candidate IDs.
 
 ---
 
@@ -118,14 +118,14 @@ Start the Streamlit local dashboard:
 ```bash
 streamlit run frontend/app.py
 ```
-Open **[http://localhost:8501](http://localhost:8501)** in your browser. You can load the default `sample_candidates.json` or upload your own file.
+Open **[http://localhost:8501](http://localhost:8501)** in your browser. By default, it loads the full 100K candidates dataset (`candidates.jsonl.gz`) and the default query from `job_description.docx` (truncated on a sentence boundary). You can upload a custom JSON/JSONL dataset (up to 15MB) in the sidebar.
 
 ### 3. Run the CLI Ranker (Validator Compliant)
-To output a submission file compliant with the hackathon validation scripts:
+To output a submission file compliant with the hackathon validation scripts using the full 100K dataset:
 ```bash
-python rank.py --candidates ./backend/data/sample_candidates.json --out submission.csv
+python rank.py --candidates ./backend/data/candidates.jsonl.gz --out submission.csv
 ```
-This runs the full preprocessing and ranking pipeline using the organizers' job description, and saves a padded 100-row file called `submission.csv`.
+This runs the full preprocessing and ranking pipeline using the organizers' job description, and saves the top 100 candidates sorted in decreasing score order into `submission.csv`.
 
 ### 4. Validate the Submission Format
 Run the organizers' validation script on your generated CSV:
