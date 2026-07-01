@@ -28,8 +28,9 @@ team_members:
 # ============================================================================
 github_repo: "https://github.com/harsh-18/semantic-talent-graph"
 sandbox_link: "https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/"
+backend_sandbox_link: "https://huggingface.co/spaces/harshverma27/semantic-talent-backend"
 
-reproduce_command: "python rank.py --candidates ./backend/data/candidates.jsonl --out ./submission.csv"
+reproduce_command: "python rank.py --candidates ./backend/data/candidates.jsonl.gz --out ./submission.csv"
 # The single command that produces submission.csv from candidates.jsonl.
 # Highly optimized line-by-line streaming parses the 500MB file on CPU in under 2 minutes.
 

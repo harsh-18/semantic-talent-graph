@@ -2,9 +2,18 @@
 
 AI-powered semantic candidate discovery, ranking, and verification system built for the India Runs x Redrob Hackathon.
 
-🚀 **Live Streamlit App:** [semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app](https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/)
+🚀 **Live Streamlit App (Frontend):** [semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app](https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/)
+🌐 **Live Hugging Face Space (Backend API):** [harshverma27/semantic-talent-backend](https://huggingface.co/spaces/harshverma27/semantic-talent-backend) (API Endpoint: `https://harshverma27-semantic-talent-backend.hf.space`)
 
-Semantic Talent Graph allows recruiters to execute high-dimensional semantic search queries against candidate profile pools. The system automatically computes platform engagement metrics (Behavioral Signal Score), filters/flags fraudulent profiles (Honeypot Anomaly Detection), and scores candidates based on a weighted combination of semantic relevance and engagement.
+---
+
+## 📸 Project Screenshots
+
+### 1. Recruiter Search & Candidate Ranking Dashboard (Frontend Streamlit)
+![Streamlit Frontend App](docs/screenshots/frontend_dashboard.png)
+
+### 2. Operational FastAPI API Status (Hugging Face Space Backend)
+![FastAPI Backend Space](docs/screenshots/backend_api.png)
 
 ---
 

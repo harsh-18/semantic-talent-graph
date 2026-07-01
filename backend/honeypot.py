@@ -79,9 +79,7 @@ def remove_honeypots(processed_candidates):
 
     for candidate in processed_candidates:
 
-        raw = candidate["raw_candidate"]
-
-        if not is_honeypot(raw):
+        if not candidate.get("is_honeypot", False):
 
             clean_candidates.append(candidate)
 

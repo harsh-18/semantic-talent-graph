@@ -88,16 +88,13 @@ def is_active_candidate(candidate):
     if not last_active:
         return False
 
-    last_active = datetime.strptime(
-        last_active,
-        "%Y-%m-%d"
-    )
-
-    today = datetime.today()
-
-    days = (today - last_active).days
-
-    return days <= 90
+    try:
+        parts = last_active.split("-")
+        last_active_dt = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+        days = (datetime.today() - last_active_dt).days
+        return days <= 90
+    except Exception:
+        return False
 def extract_behavior(candidate):
 
     return {
