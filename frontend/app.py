@@ -84,14 +84,15 @@ else:
     api_url = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 api_connected = False
 try:
-    response = requests.get(api_url, timeout=2)
+    response = requests.get(api_url, timeout=5)
     if response.status_code == 200:
         api_connected = True
         st.sidebar.success("🟢 API Status: Connected (FastAPI backend)")
     else:
-        st.sidebar.warning("⚠️ API Status: Warning (Backend returned non-200)")
-except Exception:
+        st.sidebar.warning(f"⚠️ API Status: Warning (Backend returned {response.status_code})")
+except Exception as e:
     st.sidebar.warning("⚠️ API Status: Offline (Running in Local Fallback mode)")
+    st.sidebar.info(f"Connection Debug Info: {e}")
 
 # Sidebar File Uploader and Parameters (Always show or show when API is offline)
 st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
