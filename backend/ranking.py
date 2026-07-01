@@ -1,160 +1,124 @@
-import os
-import json
-from datetime import datetime, date
-import pandas as pd
+import re
+from typing import List, Dict, Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from docx import Document
 
-# AI skills list
-AI_SKILLS = {"machine learning", "deep learning", "nlp", "python", "tensorflow", 
-             "pytorch", "llm", "transformers", "bert", "gpt", "scikit-learn",
-             "mlops", "langchain", "embeddings", "fine-tuning llms", "computer vision",
-             "recommendation systems", "feature engineering", "data science"}
+def extract_matched_skills(query: str, candidate_skills: List[Dict[str, Any]]) -> List[str]:
+    """
+    Find which candidate skills are mentioned or match the search query.
+    """
+    if not query:
+        return []
+    
+    query_words = set(re.findall(r"\b\w+\b", query.lower()))
+    matched = []
+    
+    for skill in candidate_skills:
+        name = skill.get("name", "")
+        name_lower = name.lower()
+        if name_lower in query.lower() or any(part in query_words for part in name_lower.split()):
+            matched.append(name)
+            
+    return matched
 
-def count_ai_skills(candidate):
-    skills = [s['name'].lower() for s in candidate.get('skills', [])]
-    return sum(1 for s in skills if s in AI_SKILLS)
+def generate_reasoning(
+    similarity_score: float, 
+    behavior_score: float, 
+    is_honeypot_flag: bool,
+    honeypot_score: int,
+    candidate: Dict[str, Any], 
+    matched_skills: List[str]
+) -> str:
+    """
+    Generate detailed semantic alignment analysis reasoning.
+    """
+    reasons = []
+    profile = candidate.get("profile", {})
+    title = profile.get("current_title", "Professional")
+    exp = profile.get("years_of_experience", 0)
+    
+    if is_honeypot_flag:
+        reasons.append(f"⚠️ Flagged as potential Honeypot (Score: {honeypot_score}/100). Profile details contain consistency or stuffing anomalies.")
+        return " ".join(reasons)
+        
+    if similarity_score > 70:
+        reasons.append(f"Excellent semantic fit as a {title}.")
+    elif similarity_score > 40:
+        reasons.append(f"Moderate semantic match with requested role foundations.")
+    else:
+        reasons.append(f"Low semantic matching; profile text overlaps minimally with query.")
 
-def final_score(candidate, tfidf_score):
-    # Inactive penalty
-    last_active = candidate['redrob_signals']['last_active_date']
-    last_date = datetime.strptime(last_active, "%Y-%m-%d").date()
-    days_inactive = (date.today() - last_date).days
-    activity_multiplier = 0.75 if days_inactive > 180 else 1.0
+    if matched_skills:
+        reasons.append(f"Matches key query requirements: {', '.join(matched_skills)}.")
+    else:
+        reasons.append("No direct skill matches found in the search query.")
+        
+    reasons.append(f"Brings {exp:.1f} years of experience in {profile.get('current_industry', 'industry')}.")
     
-    # AI skills boost
-    ai_count = count_ai_skills(candidate)
-    ai_boost = 1 + (ai_count * 0.05)
-    
-    return tfidf_score * activity_multiplier * ai_boost
-
-def generate_reasoning(candidate, score):
-    title = candidate['profile']['current_title']
-    yrs = candidate['profile']['years_of_experience']
-    response_rate = candidate['redrob_signals']['recruiter_response_rate']
-    ai_skills = count_ai_skills(candidate)
-    return f"{title} with {yrs} yrs; {ai_skills} AI core skills; response rate {response_rate:.2f}."
-
-def build_resume_text(candidate):
-    parts = []
-    
-    # Profile summary
-    parts.append(candidate['profile'].get('summary', ''))
-    
-    # Current title
-    parts.append(candidate['profile'].get('current_title', ''))
-    
-    # Career descriptions
-    for job in candidate.get('career_history', []):
-        parts.append(job.get('description', ''))
-    
-    # Skills
-    skill_names = [s['name'] for s in candidate.get('skills', [])]
-    parts.append(' '.join(skill_names))
-    
-    return ' '.join(parts)
+    signals = candidate.get("redrob_signals", {})
+    if behavior_score > 70:
+        reasons.append(f"Highly engaged candidate with {signals.get('profile_completeness_score', 0)}% profile completeness and {signals.get('connection_count', 0)}+ connections.")
+    elif behavior_score > 40:
+        reasons.append("Steady platform engagement signals.")
+    else:
+        reasons.append("Low platform activity signals.")
+        
+    if signals.get("open_to_work_flag", False):
+        reasons.append("Actively open to new opportunities.")
+        
+    return " ".join(reasons)
 
 def rank_candidates(candidates, query):
     """
     Ranks candidates using TF-IDF + Cosine Similarity based on query.
     Aligned with the frontend's local ranking engine.
     """
-    import sys
-    import os
-    
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
-    frontend_dir = os.path.join(parent_dir, "frontend")
-    
-    if frontend_dir not in sys.path:
-        sys.path.append(frontend_dir)
+    if not candidates:
+        return []
         
-    from local_ranking import local_rank_candidates
+    cleaned_query = query.strip()
+    similarity_scores = [0.0] * len(candidates)
     
-    # Run the local ranking with default weights
-    return local_rank_candidates(
-        query=query,
-        processed_candidates=candidates,
-        similarity_weight=0.7,
-        behavior_weight=0.3,
-        hide_honeypots=False  # Keep all candidates in the search API response
-    )
-
-if __name__ == "__main__":
-    # Standalone execution logic (Sapna's pipeline)
-    print("Running standalone ranking pipeline...")
+    if cleaned_query:
+        corpus = [c.get("combined_text", "") for c in candidates]
+        vectorizer = TfidfVectorizer(stop_words="english")
+        try:
+            tfidf_matrix = vectorizer.fit_transform(corpus)
+            query_vector = vectorizer.transform([cleaned_query])
+            cos_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
+            similarity_scores = [float(score) * 100.0 for score in cos_similarities]
+        except Exception:
+            similarity_scores = [0.0] * len(candidates)
+            
+    ranked_list = []
+    for i, c in enumerate(candidates):
+        sim_score = similarity_scores[i]
+        beh_score = c.get("behavior_score", 0.0)
+        
+        # Aligned composite score calculation
+        match_score = sim_score * 0.7 + beh_score * 0.3
+        match_score_scaled = match_score / 100.0
+        
+        raw = c.get("raw_candidate", c)
+        matched_skills = extract_matched_skills(query, raw.get("skills", []))
+        reasoning_text = generate_reasoning(
+            sim_score, 
+            beh_score, 
+            c.get("is_honeypot", False),
+            c.get("honeypot_score", 0),
+            raw, 
+            matched_skills
+        )
+        
+        ranked_c = dict(c)
+        ranked_c["match_score"] = round(match_score_scaled, 4)
+        ranked_c["similarity_score"] = round(sim_score, 1)
+        ranked_c["behavior_score"] = round(beh_score, 1)
+        ranked_c["reasoning"] = reasoning_text
+        
+        ranked_list.append(ranked_c)
+        
+    # Enforce candidate_id ascending tie-break rule during sorting
+    ranked_list.sort(key=lambda x: (-x["match_score"], x.get("candidate_id", "")))
     
-    # ── Step 1: Data Load ──────────────────────────
-    data_file = "data/sample_candidates.json"
-    if not os.path.exists(data_file) and os.path.exists("backend/data/sample_candidates.json"):
-        data_file = "backend/data/sample_candidates.json"
-        
-    with open(data_file, "r") as f:
-        candidates = json.load(f)
-
-    print(f"Total candidates: {len(candidates)}")
-    print(f"First ID: {candidates[0]['candidate_id']}")
-    print(f"Keys: {list(candidates[0].keys())}")
-
-    # Test karo
-    print("Testing resume text builder on top 3 candidates:")
-    for c in candidates[:3]:
-        text = build_resume_text(c)
-        print(f"{c['candidate_id']}: {text[:100]}...")
-        print()
-
-    # ── Step 3: JD Load ────────────────────────────
-    jd_file = "data/job_description.docx"
-    if not os.path.exists(jd_file) and os.path.exists("backend/data/job_description.docx"):
-        jd_file = "backend/data/job_description.docx"
-        
-    doc = Document(jd_file)
-    jd_text = ""
-    for para in doc.paragraphs:
-        if para.text.strip():
-            jd_text += para.text + " "
-
-    print("JD loaded!")
-    print(jd_text[:500])
-
-    # ── Step 4: TF-IDF Ranking ─────────────────────
-    # Sabke resume text banao
-    corpus = []
-    for c in candidates:
-        corpus.append(build_resume_text(c))
-
-    # TF-IDF fit karo JD + sabke resumes pe
-    vectorizer = TfidfVectorizer(stop_words='english')
-    all_docs = [jd_text] + corpus
-    tfidf_matrix = vectorizer.fit_transform(all_docs)
-
-    # JD vs har candidate ka cosine similarity
-    jd_vector = tfidf_matrix[0]
-    resume_vectors = tfidf_matrix[1:]
-    scores = cosine_similarity(jd_vector, resume_vectors)[0]
-
-    print("Top 5 scores:", sorted(scores, reverse=True)[:5])
-
-    # ── Step 5: Reasoning + CSV ────────────────────
-    # Sort + Top 100
-    adjusted_scores = [final_score(c, s) for c, s in zip(candidates, scores)]
-    ranked = sorted(zip(candidates, adjusted_scores), key=lambda x: -x[1])
-    top100 = ranked[:100]
-
-    # CSV banao
-    rows = []
-    for rank, (candidate, score) in enumerate(top100, 1):
-        rows.append({
-            "candidate_id": candidate['candidate_id'],
-            "rank": rank,
-            "score": round(score, 4),
-            "reasoning": generate_reasoning(candidate, score)
-        })
-
-    df = pd.DataFrame(rows)
-    os.makedirs("output", exist_ok=True)
-    df.to_csv("output/top100_candidates.csv", index=False)
-    print("CSV saved to output/top100_candidates.csv!")
-    print(df.head(5))
-
+    return ranked_list
