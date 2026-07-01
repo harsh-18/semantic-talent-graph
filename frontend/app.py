@@ -100,28 +100,46 @@ except Exception as e:
 # Sidebar File Uploader and Parameters (Always show or show when API is offline)
 st.sidebar.markdown("<hr style='border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 15px 0;'>", unsafe_allow_html=True)
 st.sidebar.markdown("### 📂 Standalone Data Source")
-uploaded_file = st.sidebar.file_uploader("Upload Candidates Dataset (.json or .jsonl):", type=["json", "jsonl"])
-
-# Path resolution for local sample data
-default_candidates_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-    "backend", "data", "sample_candidates.json"
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Candidates Dataset (.json or .jsonl):", 
+    type=["json", "jsonl"],
+    help="Maximum file size allowed is 15MB. Larger files will be blocked and fallback to the default dataset."
 )
 
-# Load data based on input
+# Path resolution for local candidate dataset
+default_candidates_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+    "backend", "data", "candidates.jsonl.gz"
+)
+if not os.path.exists(default_candidates_path):
+    default_candidates_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+        "backend", "data", "sample_candidates.json"
+    )
+
+# Load data based on input with 15MB file size kill-switch
 candidates_source_path = None
+MAX_FILE_SIZE_MB = 15
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 if uploaded_file is not None:
-    temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scratch")
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, uploaded_file.name)
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    candidates_source_path = temp_path
-    st.sidebar.success(f"Loaded: {uploaded_file.name}")
-else:
+    if uploaded_file.size > MAX_FILE_SIZE_BYTES:
+        st.sidebar.error("File too large for live demo upload. Falling back to default 100K dataset.")
+        uploaded_file = None  # Kill-switch: reject file upload and clear reference
+    else:
+        temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scratch")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, uploaded_file.name)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        candidates_source_path = temp_path
+        st.sidebar.success(f"Loaded: {uploaded_file.name}")
+
+if uploaded_file is None:
     if os.path.exists(default_candidates_path):
         candidates_source_path = default_candidates_path
-        st.sidebar.info("Using default `sample_candidates.json`")
+        filename = os.path.basename(default_candidates_path)
+        st.sidebar.info(f"Using default dataset ({filename})")
     else:
         st.sidebar.error("Default dataset not found. Please upload a file.")
 
@@ -160,11 +178,36 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Helper to extract and shorten job description as default query
+default_jd_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "backend", "data", "job_description.docx"
+)
+default_query = "Looking for a Backend Software Engineer with Python, SQL, Spark, and Cloud experience."
+if os.path.exists(default_jd_path):
+    try:
+        from preprocess import load_job_description
+        full_text = load_job_description(default_jd_path).strip()
+        if full_text:
+            # Shorten to around 800 characters to fit easily in the search box
+            if len(full_text) <= 800:
+                default_query = full_text
+            else:
+                shortened = full_text[:800]
+                last_period = shortened.rfind(".")
+                if last_period != -1:
+                    default_query = shortened[:last_period + 1].strip()
+                else:
+                    default_query = shortened.strip() + "..."
+    except Exception as e:
+        pass
+
 # Recruiter Query Input
 st.markdown("### 🔍 Semantic Match Query")
-search_query = st.text_input(
+search_query = st.text_area(
     label="Search by job description, core skills, or role requirements:",
-    value="Looking for a Backend Software Engineer with Python, SQL, Spark, and Cloud experience.",
+    value=default_query,
+    height=150,
     placeholder="Type candidate requirements (e.g. Frontend Developer with React and Tailwind)..."
 )
 
@@ -181,8 +224,8 @@ if run_btn:
             df_submission = None
             total_candidates = 0
             
-            # --- Path A: FastAPI Backend (if online) ---
-            if api_connected:
+            # --- Path A: FastAPI Backend (if online & no custom file is uploaded) ---
+            if api_connected and uploaded_file is None:
                 try:
                     search_endpoint = f"{api_url}/search"
                     response = requests.post(search_endpoint, json={"query": search_query}, timeout=30)

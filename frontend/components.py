@@ -316,7 +316,7 @@ def render_candidate_card(candidate_item: Dict[str, Any]):
     current_industry = profile.get("current_industry", "N/A")
     
     # Progress value for streamlit progress bar (0.0 to 1.0)
-    progress_val = max(0.0, min(1.0, float(match_score) / 100.0))
+    progress_val = max(0.0, min(1.0, float(match_score)))
     
     # Header tags
     rank_html = f'<span class="rank-tag">Rank {rank}</span>'
@@ -377,7 +377,7 @@ def render_candidate_card(candidate_item: Dict[str, Any]):
                 <!-- Match Score Section -->
                 <div class="custom-progress-info">
                     <strong>Composite Match Score</strong>
-                    <strong>{match_score}%</strong>
+                    <strong>{float(match_score) * 100:.1f}%</strong>
                 </div>
             </div>
             """,

@@ -198,6 +198,9 @@ def local_rank_candidates(
         else:
             match_score = 0.0
             
+        # Scale composite match score to [0.0, 1.0] for challenge/submission compliance
+        match_score_scaled = match_score / 100.0
+            
         raw = pc["raw_candidate"]
         matched_skills = extract_matched_skills(query, raw.get("skills", []))
         reasoning_text = generate_reasoning(
@@ -211,7 +214,7 @@ def local_rank_candidates(
         
         ranked_list.append({
             "candidate_id": pc["candidate_id"],
-            "match_score": round(match_score, 1),
+            "match_score": round(match_score_scaled, 4),
             "similarity_score": round(sim_score, 1),
             "behavior_score": round(beh_score, 1),
             "honeypot_score": pc["honeypot_score"],

@@ -58,71 +58,28 @@ def build_resume_text(candidate):
 def rank_candidates(candidates, query):
     """
     Ranks candidates using TF-IDF + Cosine Similarity based on query.
-    candidates: List of candidate dictionaries (preprocessed or raw).
-    query: The search query string.
+    Aligned with the frontend's local ranking engine.
     """
-    if not candidates:
-        return []
-        
-    cleaned_query = query.strip()
-    if not cleaned_query:
-        # Fallback: sort by behavior_score (descending) and candidate_id (ascending)
-        return sorted(candidates, key=lambda x: (-x.get("behavior_score", 0.0), x.get("candidate_id", "")))
-        
-    # Build text corpus for TF-IDF. 
-    # Use pre-computed combined_text if available, otherwise build it.
-    corpus = []
-    for c in candidates:
-        if "combined_text" in c:
-            corpus.append(c["combined_text"])
-        else:
-            raw_c = c.get("raw_candidate", c)
-            corpus.append(build_resume_text(raw_c))
-            
-    # TF-IDF fit
-    vectorizer = TfidfVectorizer(stop_words='english')
-    all_docs = [cleaned_query] + corpus
+    import sys
+    import os
     
-    try:
-        tfidf_matrix = vectorizer.fit_transform(all_docs)
-        query_vector = tfidf_matrix[0]
-        resume_vectors = tfidf_matrix[1:]
-        scores = cosine_similarity(query_vector, resume_vectors)[0]
-    except Exception:
-        scores = [0.0] * len(candidates)
-        
-    # Rank candidates and assign scores
-    ranked_list = []
-    for c, score in zip(candidates, scores):
-        raw = c.get("raw_candidate", c)
-        
-        # Calculate final adjusted score
-        try:
-            adj_score = final_score(raw, score)
-        except Exception:
-            adj_score = score
-            
-        try:
-            reasoning = generate_reasoning(raw, adj_score)
-        except Exception:
-            reasoning = "TF-IDF matching candidate profile."
-            
-        ranked_c = dict(c)
-        # Store scores and reasoning in candidate dictionary
-        ranked_c["match_score"] = round(adj_score, 4)
-        ranked_c["similarity_score"] = round(score, 4)
-        ranked_c["reasoning"] = reasoning
-        
-        # If behavior_score is not in the dictionary, ensure it's there
-        if "behavior_score" not in ranked_c:
-            ranked_c["behavior_score"] = c.get("behavior_signals", {}).get("behavior_score", 0.0)
-            
-        ranked_list.append(ranked_c)
-        
-    # Enforce candidate_id ascending tie-break rule during sorting
-    ranked_list.sort(key=lambda x: (-x["match_score"], x.get("candidate_id", "")))
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    frontend_dir = os.path.join(parent_dir, "frontend")
     
-    return ranked_list
+    if frontend_dir not in sys.path:
+        sys.path.append(frontend_dir)
+        
+    from local_ranking import local_rank_candidates
+    
+    # Run the local ranking with default weights
+    return local_rank_candidates(
+        query=query,
+        processed_candidates=candidates,
+        similarity_weight=0.7,
+        behavior_weight=0.3,
+        hide_honeypots=False  # Keep all candidates in the search API response
+    )
 
 if __name__ == "__main__":
     # Standalone execution logic (Sapna's pipeline)
