@@ -21,7 +21,7 @@ app = FastAPI(
 
 print("\nLoading candidate dataset...")
 
-DATA_PATH = "data/candidates.jsonl"
+DATA_PATH = "data/candidates.jsonl.gz"
 
 raw_candidates = load_candidates(DATA_PATH)
 

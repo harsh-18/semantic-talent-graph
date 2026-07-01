@@ -6,36 +6,55 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def local_load_candidates(file_path: str) -> List[Dict[str, Any]]:
     """
-    Load candidates from JSON or JSONL file.
+    Load candidates from JSON, JSONL, or JSONL.GZ file.
     Returns a list of candidate dictionaries. Highly memory-efficient.
     """
+    import os
+    import gzip
+    import json
+
+    # If looking for candidates.jsonl but candidates.jsonl.gz exists, use it
+    if not os.path.exists(file_path):
+        if file_path.endswith("candidates.jsonl") and os.path.exists(file_path + ".gz"):
+            file_path = file_path + ".gz"
+        elif file_path.endswith("candidates.jsonl") and os.path.exists(file_path.replace("candidates.jsonl", "candidates.jsonl.gz")):
+            file_path = file_path.replace("candidates.jsonl", "candidates.jsonl.gz")
+
+    is_gzip = file_path.endswith(".gz")
+
+    def open_file(path):
+        if is_gzip:
+            return gzip.open(path, "rt", encoding="utf-8")
+        return open(path, "r", encoding="utf-8")
+
     # 1. Peek at the first character to determine format
-    with open(file_path, "r", encoding="utf-8") as file:
-        try:
+    try:
+        with open_file(file_path) as file:
             first_char = file.read(1).strip()
-        except Exception:
-            first_char = ""
+    except Exception:
+        first_char = ""
             
     # 2. If it's a JSON array, load the entire file
     if first_char == "[":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open_file(file_path) as file:
             try:
-                import json
                 return json.load(file)
             except Exception:
                 pass
                 
     # 3. Otherwise, parse as JSONL line-by-line to avoid loading full file content into memory
     candidates = []
-    import json
-    with open(file_path, "r", encoding="utf-8") as file:
-        for line in file:
-            line = line.strip()
-            if line:
-                try:
-                    candidates.append(json.loads(line))
-                except Exception:
-                    pass
+    try:
+        with open_file(file_path) as file:
+            for line in file:
+                line = line.strip()
+                if line:
+                    try:
+                        candidates.append(json.loads(line))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
     return candidates
 
 def extract_matched_skills(query: str, candidate_skills: List[Dict[str, Any]]) -> List[str]:

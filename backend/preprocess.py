@@ -15,33 +15,48 @@ from honeypot import (
 
 def load_candidates(file_path):
     """
-    Load candidates from JSON or JSONL file.
-    Supports fallbacks and handles large datasets.
+    Load candidates from JSON, JSONL, or JSONL.GZ file.
+    Supports gzip compression, fallbacks, and handles large datasets.
     """
     import os
     import json
+    import gzip
 
     # Fallback checks
     if not os.path.exists(file_path):
-        dir_name = os.path.dirname(file_path)
-        base_name = os.path.basename(file_path)
-        
-        # If looking for candidates.jsonl but not found, try sample_candidates.json
-        if "candidates.jsonl" in base_name:
-            fallback_path = os.path.join(dir_name if dir_name else "data", "sample_candidates.json")
-            if os.path.exists(fallback_path):
-                file_path = fallback_path
-            elif os.path.exists("backend/data/sample_candidates.json"):
-                file_path = "backend/data/sample_candidates.json"
-            elif os.path.exists("data/sample_candidates.json"):
-                file_path = "data/sample_candidates.json"
-        
-        # If file_path still does not exist, throw FileNotFoundError
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Could not find candidate data file at {file_path}")
+        # If looking for candidates.jsonl but candidates.jsonl.gz exists, use it
+        if file_path.endswith("candidates.jsonl") and os.path.exists(file_path + ".gz"):
+            file_path = file_path + ".gz"
+        elif file_path.endswith("candidates.jsonl") and os.path.exists(file_path.replace("candidates.jsonl", "candidates.jsonl.gz")):
+            file_path = file_path.replace("candidates.jsonl", "candidates.jsonl.gz")
+        else:
+            dir_name = os.path.dirname(file_path)
+            base_name = os.path.basename(file_path)
+            
+            # If looking for candidates.jsonl but not found, try sample_candidates.json
+            if "candidates.jsonl" in base_name:
+                fallback_path = os.path.join(dir_name if dir_name else "data", "sample_candidates.json")
+                if os.path.exists(fallback_path):
+                    file_path = fallback_path
+                elif os.path.exists("backend/data/sample_candidates.json"):
+                    file_path = "backend/data/sample_candidates.json"
+                elif os.path.exists("data/sample_candidates.json"):
+                    file_path = "data/sample_candidates.json"
+            
+            # If file_path still does not exist, throw FileNotFoundError
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Could not find candidate data file at {file_path}")
+
+    # Determine if the file is gzipped
+    is_gzip = file_path.endswith(".gz")
+
+    def open_file(path):
+        if is_gzip:
+            return gzip.open(path, "rt", encoding="utf-8")
+        return open(path, "r", encoding="utf-8")
 
     # Peek at first non-whitespace char to detect JSON array vs JSONL
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open_file(file_path) as file:
         first_char = ""
         for line in file:
             line_s = line.strip()
@@ -51,12 +66,12 @@ def load_candidates(file_path):
 
     # If JSON array
     if first_char == "[":
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open_file(file_path) as file:
             return json.load(file)
 
     # If JSONL
     candidates = []
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open_file(file_path) as file:
         for line in file:
             line = line.strip()
             if line:
@@ -300,7 +315,7 @@ def preprocess_candidates(candidates):
 
 if __name__ == "__main__":
 
-    DATA_PATH = "data/candidates.jsonl"
+    DATA_PATH = "data/candidates.jsonl.gz"
 
     candidates = load_candidates(DATA_PATH)
 

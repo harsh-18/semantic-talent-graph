@@ -77,7 +77,7 @@ st.sidebar.markdown(
 st.sidebar.markdown("### 🔌 API Integration Status")
 
 # Check FastAPI API status
-api_url = "http://localhost:8000"
+api_url = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 api_connected = False
 try:
     response = requests.get(api_url, timeout=2)
@@ -176,7 +176,7 @@ if run_btn:
             # --- Path A: FastAPI Backend (if online) ---
             if api_connected:
                 try:
-                    search_endpoint = "http://localhost:8000/search"
+                    search_endpoint = f"{api_url}/search"
                     response = requests.post(search_endpoint, json={"query": search_query}, timeout=30)
                     
                     if response.status_code == 200:
