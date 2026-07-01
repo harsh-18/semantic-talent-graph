@@ -187,7 +187,8 @@ def local_rank_candidates(
         except Exception:
             similarity_scores = [0.0] * len(filtered_candidates)
             
-    ranked_list = []
+    # Calculate scores for all candidates (computationally fast)
+    scored_candidates = []
     for i, pc in enumerate(filtered_candidates):
         sim_score = similarity_scores[i]
         beh_score = pc["behavior_score"]
@@ -200,7 +201,14 @@ def local_rank_candidates(
             
         # Scale composite match score to [0.0, 1.0] for challenge/submission compliance
         match_score_scaled = match_score / 100.0
-            
+        scored_candidates.append((pc, sim_score, beh_score, match_score_scaled))
+        
+    # Sort candidates (computationally fast)
+    scored_candidates.sort(key=lambda x: (-x[3], x[0]["candidate_id"]))
+    
+    # Process reasoning and matched skills only for top 100 candidates (computationally expensive)
+    ranked_list = []
+    for rank_idx, (pc, sim_score, beh_score, match_score_scaled) in enumerate(scored_candidates[:100]):
         raw = pc["raw_candidate"]
         matched_skills = extract_matched_skills(query, raw.get("skills", []))
         reasoning_text = generate_reasoning(
@@ -214,6 +222,7 @@ def local_rank_candidates(
         
         ranked_list.append({
             "candidate_id": pc["candidate_id"],
+            "rank": rank_idx + 1,
             "match_score": round(match_score_scaled, 4),
             "similarity_score": round(sim_score, 1),
             "behavior_score": round(beh_score, 1),
@@ -224,9 +233,5 @@ def local_rank_candidates(
             "reasoning": reasoning_text,
             "raw_candidate": raw
         })
-        
-    ranked_list.sort(key=lambda x: (-x["match_score"], x["candidate_id"]))
-    for rank_idx, item in enumerate(ranked_list):
-        item["rank"] = rank_idx + 1
         
     return ranked_list

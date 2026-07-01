@@ -3,6 +3,11 @@ from typing import List, Dict, Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# Global variables for caching vectorizer state
+_vectorizer = None
+_tfidf_matrix = None
+_cached_candidates_len = 0
+
 def extract_matched_skills(query: str, candidate_skills: List[Dict[str, Any]]) -> List[str]:
     """
     Find which candidate skills are mentioned or match the search query.
@@ -71,8 +76,11 @@ def generate_reasoning(
 def rank_candidates(candidates, query):
     """
     Ranks candidates using TF-IDF + Cosine Similarity based on query.
-    Aligned with the frontend's local ranking engine.
+    Uses cached TfidfVectorizer and tfidf_matrix to speed up searches.
+    Reasoning generation is limited only to the top 100 candidates.
     """
+    global _vectorizer, _tfidf_matrix, _cached_candidates_len
+    
     if not candidates:
         return []
         
@@ -80,17 +88,28 @@ def rank_candidates(candidates, query):
     similarity_scores = [0.0] * len(candidates)
     
     if cleaned_query:
-        corpus = [c.get("combined_text", "") for c in candidates]
-        vectorizer = TfidfVectorizer(stop_words="english")
-        try:
-            tfidf_matrix = vectorizer.fit_transform(corpus)
-            query_vector = vectorizer.transform([cleaned_query])
-            cos_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
-            similarity_scores = [float(score) * 100.0 for score in cos_similarities]
-        except Exception:
-            similarity_scores = [0.0] * len(candidates)
-            
-    ranked_list = []
+        # Fit vectorizer once for the candidate set
+        if _vectorizer is None or _cached_candidates_len != len(candidates):
+            _vectorizer = TfidfVectorizer(stop_words="english")
+            corpus = [c.get("combined_text", "") for c in candidates]
+            try:
+                _tfidf_matrix = _vectorizer.fit_transform(corpus)
+                _cached_candidates_len = len(candidates)
+            except Exception:
+                _vectorizer = None
+                _tfidf_matrix = None
+                _cached_candidates_len = 0
+                
+        if _vectorizer is not None and _tfidf_matrix is not None:
+            try:
+                query_vector = _vectorizer.transform([cleaned_query])
+                cos_similarities = cosine_similarity(query_vector, _tfidf_matrix).flatten()
+                similarity_scores = [float(score) * 100.0 for score in cos_similarities]
+            except Exception:
+                similarity_scores = [0.0] * len(candidates)
+                
+    # Calculate scores for all candidates (computationally fast)
+    scored_candidates = []
     for i, c in enumerate(candidates):
         sim_score = similarity_scores[i]
         beh_score = c.get("behavior_score", 0.0)
@@ -99,6 +118,15 @@ def rank_candidates(candidates, query):
         match_score = sim_score * 0.7 + beh_score * 0.3
         match_score_scaled = match_score / 100.0
         
+        scored_candidates.append((c, sim_score, beh_score, match_score_scaled))
+        
+    # Sort all candidates (computationally fast)
+    # Enforce candidate_id ascending tie-break rule during sorting
+    scored_candidates.sort(key=lambda x: (-x[3], x[0].get("candidate_id", "")))
+    
+    # Process reasoning and matched skills only for top 100 candidates (computationally expensive)
+    ranked_list = []
+    for rank_idx, (c, sim_score, beh_score, match_score_scaled) in enumerate(scored_candidates[:100]):
         raw = c.get("raw_candidate", c)
         matched_skills = extract_matched_skills(query, raw.get("skills", []))
         reasoning_text = generate_reasoning(
@@ -118,7 +146,4 @@ def rank_candidates(candidates, query):
         
         ranked_list.append(ranked_c)
         
-    # Enforce candidate_id ascending tie-break rule during sorting
-    ranked_list.sort(key=lambda x: (-x["match_score"], x.get("candidate_id", "")))
-    
     return ranked_list

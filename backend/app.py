@@ -33,6 +33,11 @@ print(f"Backend Ready!")
 print(f"Candidates Loaded : {len(raw_candidates)}")
 print(f"Candidates After Cleaning : {len(clean_candidates)}")
 
+# Warm up the TF-IDF vectorizer at startup so the first request is instant!
+print("Warming up TF-IDF vectorizer...")
+_ = rank_candidates(clean_candidates, "warmup")
+print("Warmup complete!")
+
 
 # ===================================================
 # Home Route
