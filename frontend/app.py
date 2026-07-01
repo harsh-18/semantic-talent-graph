@@ -178,7 +178,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Helper to extract and shorten job description as default query
+# Helper to extract the full job description as default query
 default_jd_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "backend", "data", "job_description.docx"
@@ -189,16 +189,7 @@ if os.path.exists(default_jd_path):
         from preprocess import load_job_description
         full_text = load_job_description(default_jd_path).strip()
         if full_text:
-            # Shorten to around 800 characters to fit easily in the search box
-            if len(full_text) <= 800:
-                default_query = full_text
-            else:
-                shortened = full_text[:800]
-                last_period = shortened.rfind(".")
-                if last_period != -1:
-                    default_query = shortened[:last_period + 1].strip()
-                else:
-                    default_query = shortened.strip() + "..."
+            default_query = full_text
     except Exception as e:
         pass
 
@@ -207,7 +198,7 @@ st.markdown("### 🔍 Semantic Match Query")
 search_query = st.text_area(
     label="Search by job description, core skills, or role requirements:",
     value=default_query,
-    height=150,
+    height=200,
     placeholder="Type candidate requirements (e.g. Frontend Developer with React and Tailwind)..."
 )
 
