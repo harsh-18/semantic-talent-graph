@@ -200,3 +200,4 @@ if __name__ == "__main__":
     df.to_csv("output/top100_candidates.csv", index=False)
     print("CSV saved to output/top100_candidates.csv!")
     print(df.head(5))
+
