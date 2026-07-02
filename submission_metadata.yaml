@@ -16,10 +16,10 @@ team_members:
   - name: "Harsh Verma"
     email: "vharsh26@gmail.com"
     role: "Backend & Team Lead, Product Manager/Business Analyst"
-  - name: "Vanshika"
+  - name: "Vanshika Vaidya"
     email: "vanshikavaidya655@gmail.com"                   
     role: "Frontend & Safety"
-  - name: "Sapna"
+  - name: "Sapna Choudhary"
     email: "sapnachoudhary8243@gmail.com"                    
     role: "Refiner & Ranking"
 
@@ -29,6 +29,7 @@ team_members:
 github_repo: "https://github.com/harsh-18/semantic-talent-graph"
 sandbox_link: "https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/"
 backend_sandbox_link: "https://huggingface.co/spaces/harshverma27/semantic-talent-backend"
+demo_video: "https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0"
 
 reproduce_command: "python rank.py --candidates ./backend/data/candidates.jsonl.gz --out ./submission.csv"
 # The single command that produces submission.csv from candidates.jsonl.

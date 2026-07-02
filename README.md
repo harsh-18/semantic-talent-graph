@@ -4,6 +4,7 @@ AI-powered semantic candidate discovery, ranking, and verification system built 
 
 🚀 **Live Streamlit App (Frontend):** [semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app](https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/)
 🌐 **Live Hugging Face Space (Backend API):** [harshverma27/semantic-talent-backend](https://huggingface.co/spaces/harshverma27/semantic-talent-backend) (API Endpoint: `https://harshverma27-semantic-talent-backend.hf.space`)
+🎥 **Demonstration Video:** [Loom Link](https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0)
 
 ---
 
@@ -44,9 +45,9 @@ The project is split into three main components:
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                           FRONTEND (harsh-ui)                                   │
 │  - Streamlit dashboard with rich custom HSL dark styling & interactive cards.   │
-│  - Weighted sliders (Semantic similarity weight vs. Behavioral score weight).  │
+│  - Weighted sliders (Semantic similarity weight vs. Behavioral score weight).   │
 │  - Direct filters (Min Experience, Min Behavior Score, Education Tiers).        │
-│  - Prominent "Honeypot Detection Passed/Flagged" warning system.                 │
+│  - Prominent "Honeypot Detection Passed/Flagged" warning system.                │
 │  - 1-Click CSV Export button auto-formatted and padded to exactly 100 rows.     │
 └────────────────────────┬────────────────────────────────┬───────────────────────┘
                          │                                │
@@ -56,8 +57,8 @@ The project is split into three main components:
 │        BACKEND (vanshika-backend)        │    │    REFINER (swapna-refiner)     │
 │  - Candidate ingestion (JSON/JSONL).     │    │  - TF-IDF Vectorizer & Cosine   │
 │  - Profile Completeness calculations.    │    │    Similarity.                  │
-│  - Anomaly & Honeypot detection scoring.  │    │  - Composite weighted ranker.   │
-│  - Core data loading & parsing.          │    │  - Semantic explanation reasoning.│
+│  - Anomaly & Honeypot detection scoring. │    │  - Composite weighted ranker.   │
+│  - Core data loading & parsing.          │    │- Semantic explanation reasoning.│
 └──────────────────────────────────────────┘    └─────────────────────────────────┘
 ```
 
