@@ -4,7 +4,18 @@ AI-powered semantic candidate discovery, ranking, and verification system built 
 
 🚀 **Live Streamlit App (Frontend):** [semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app](https://semantic-talent-graph-tvakmfarz76p2hggiyv5ft.streamlit.app/)
 🌐 **Live Hugging Face Space (Backend API):** [harshverma27/semantic-talent-backend](https://huggingface.co/spaces/harshverma27/semantic-talent-backend) (API Endpoint: `https://harshverma27-semantic-talent-backend.hf.space`)
-🎥 **Demonstration Video:** [Loom Link](https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0)
+
+---
+
+## 🎥 Demonstration Video
+
+<div align="center">
+  <a href="https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0">
+    <img src="https://cdn.loom.com/sessions/thumbnails/da2edbaccacd4db282c618a3e77b6fd0-with-play.jpg" alt="Semantic Talent Graph Demo" width="600">
+  </a>
+</div>
+
+Click the image above to watch the full demonstration video on Loom, or [open in new window](https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0).
 
 ---
 
@@ -42,24 +53,24 @@ The project is split into three main components:
                                  │
                         [Search Query / Filters]
                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           FRONTEND (harsh-ui)                                   │
-│  - Streamlit dashboard with rich custom HSL dark styling & interactive cards.   │
-│  - Weighted sliders (Semantic similarity weight vs. Behavioral score weight).   │
-│  - Direct filters (Min Experience, Min Behavior Score, Education Tiers).        │
-│  - Prominent "Honeypot Detection Passed/Flagged" warning system.                │
-│  - 1-Click CSV Export button auto-formatted and padded to exactly 100 rows.     │
-└────────────────────────┬────────────────────────────────┬───────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                           FRONTEND (harsh-ui)                    │
+│  - Streamlit dashboard with rich custom HSL dark styling.        │
+│  - Weighted sliders (Semantic similarity vs. Behavioral score).   │
+│  - Direct filters (Min Experience, Min Behavior Score, Tiers).   │
+│  - Prominent "Honeypot Detection Passed/Flagged" warning.        │
+│  - 1-Click CSV Export button auto-formatted to 100 rows.         │
+└────────────────────────┬────────────────────────────────┬────────┘
                          │                                │
                  [Processed Pool]                 [Cosine Similarity]
                          ▼                                ▼
-┌──────────────────────────────────────────┐    ┌─────────────────────────────────┐
-│        BACKEND (vanshika-backend)        │    │    REFINER (swapna-refiner)     │
-│  - Candidate ingestion (JSON/JSONL).     │    │  - TF-IDF Vectorizer & Cosine   │
-│  - Profile Completeness calculations.    │    │    Similarity.                  │
-│  - Anomaly & Honeypot detection scoring. │    │  - Composite weighted ranker.   │
-│  - Core data loading & parsing.          │    │- Semantic explanation reasoning.│
-└──────────────────────────────────────────┘    └─────────────────────────────────┘
+┌──────────────────────────────────────────┐    ┌────────────────────┐
+│        BACKEND (vanshika-backend)        │    │  REFINER (swapna)  │
+│  - Candidate ingestion (JSON/JSONL).     │    │  - TF-IDF & Cosine │
+│  - Profile Completeness calculations.    │    │    Similarity.     │
+│  - Anomaly & Honeypot detection scoring. │    │  - Weighted rank.  │
+│  - Core data loading & parsing.          │    │  - Reasoning gen.  │
+└──────────────────────────────────────────┘    └────────────────────┘
 ```
 
 ### 1. Frontend (`harsh-ui`)
@@ -71,7 +82,7 @@ The user interface is built using Streamlit and styled with premium custom CSS (
 
 ### 2. Backend (`vanshika-backend`)
 Responsible for loading the raw database and computing safety/trust scores:
-* **Behavioral Analysis (`behavior.py`):** Calculates an engagement score (0-100) using weights from profile completeness, open to work flags, github activity, recruiter response rate, and offer acceptance history.
+* **Behavioral Analysis (`behavior.py`):** Calculates an engagement score (0-100) using weights from profile completeness, open to work flags, github activity, recruiter response rate, and offer acceptance.
 * **Honeypot Checks (`honeypot.py`):** Detects discrepancies like keyword stuffing, empty profiles, or impossible experience (i.e. claiming more experience than the sum of all career history).
 * **Data Processing (`preprocess.py`):** Normalizes, cleans punctuation, and merges candidate resume nodes into a single text corpus.
 
@@ -79,10 +90,10 @@ Responsible for loading the raw database and computing safety/trust scores:
 Bridges backend parsing and frontend search queries:
 * **Vectorization (`ranking.py`):** Fits a TF-IDF vectorizer over the corpus of cleaned text and transforms search terms.
 * **Matching:** Evaluates cosine similarity of vectors to find true conceptual relevance.
-* **Adjustment & Alignment:** Combines semantic similarity (70% weight) and behavioral engagement (30% weight), scaling the final composite score to the `[0.0, 1.0]` range with 4 decimal places for challenge spec compliance (with top candidates scoring near 0.8). Supports lexicographical tie-breaking on candidate IDs.
+* **Adjustment & Alignment:** Combines semantic similarity (70% weight) and behavioral engagement (30% weight), scaling the final composite score to the `[0.0, 1.0]` range with 4 decimal places for chart display.
 * **Search Performance Optimization (TF-IDF Caching & Lazy Reasoning):**
-  - **TF-IDF Caching**: Pre-fits the vectorizer and pre-calculates the candidate TF-IDF matrix once on startup. Subsequent search requests reuse the cached state, executing query transformations and similarity checks in `<0.1` seconds.
-  - **Lazy Reasoning**: Postpones expensive regex skill matching and reasoning string generation, executing them *only* on the top 100 ranked candidates rather than all 100,000, bringing query processing time down to under 0.2 seconds.
+  - **TF-IDF Caching**: Pre-fits the vectorizer and pre-calculates the candidate TF-IDF matrix once on startup. Subsequent search requests reuse the cached state, executing query transformations and similarity computation in milliseconds.
+  - **Lazy Reasoning**: Postpones expensive regex skill matching and reasoning string generation, executing them *only* on the top 100 ranked candidates rather than all 100,000, bringing query processing from ~10s to <500ms.
   - **Startup Warmup**: Runs a dummy warmup search query during server initialization to pre-load and cache vectorizer states, eliminating cold-start latency.
 
 ---
@@ -123,7 +134,7 @@ Start the Streamlit local dashboard:
 ```bash
 streamlit run frontend/app.py
 ```
-Open **[http://localhost:8501](http://localhost:8501)** in your browser. By default, it loads the full 100K candidates dataset (`candidates.jsonl.gz`) and the default query from `job_description.docx` (truncated on a sentence boundary). You can upload a custom JSON/JSONL dataset (up to 15MB) in the sidebar.
+Open **[http://localhost:8501](http://localhost:8501)** in your browser. By default, it loads the full 100K candidates dataset (`candidates.jsonl.gz`) and the default query from `job_description.docx`.
 
 ### 3. Run the CLI Ranker (Validator Compliant)
 To output a submission file compliant with the hackathon validation scripts using the full 100K dataset:
