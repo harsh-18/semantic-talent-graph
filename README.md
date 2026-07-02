@@ -11,11 +11,11 @@ AI-powered semantic candidate discovery, ranking, and verification system built 
 
 <div align="center">
   <a href="https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0">
-    <img src="https://cdn.loom.com/sessions/thumbnails/da2edbaccacd4db282c618a3e77b6fd0-with-play.jpg" alt="Semantic Talent Graph Demo" width="600">
+    <img src="https://img.shields.io/badge/▶_Watch_Demo-blue?style=for-the-badge&logo=loom" alt="Semantic Talent Graph Demo">
   </a>
 </div>
 
-Click the image above to watch the full demonstration video on Loom, or [open in new window](https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0).
+Click the badge above to watch the full demonstration video on Loom, or [open in new window](https://www.loom.com/share/da2edbaccacd4db282c618a3e77b6fd0).
 
 ---
 
@@ -53,24 +53,24 @@ The project is split into three main components:
                                  │
                         [Search Query / Filters]
                                  ▼
-┌──────────────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────────────────────┐
 │                           FRONTEND (harsh-ui)                    │
 │  - Streamlit dashboard with rich custom HSL dark styling.        │
 │  - Weighted sliders (Semantic similarity vs. Behavioral score).   │
 │  - Direct filters (Min Experience, Min Behavior Score, Tiers).   │
 │  - Prominent "Honeypot Detection Passed/Flagged" warning.        │
 │  - 1-Click CSV Export button auto-formatted to 100 rows.         │
-└────────────────────────┬────────────────────────────────┬────────┘
-                         │                                │
+└────────────────────────┬────────────────────────────┬──────────┘
+                         │                            │
                  [Processed Pool]                 [Cosine Similarity]
-                         ▼                                ▼
-┌──────────────────────────────────────────┐    ┌────────────────────┐
-│        BACKEND (vanshika-backend)        │    │  REFINER (swapna)  │
-│  - Candidate ingestion (JSON/JSONL).     │    │  - TF-IDF & Cosine │
-│  - Profile Completeness calculations.    │    │    Similarity.     │
-│  - Anomaly & Honeypot detection scoring. │    │  - Weighted rank.  │
-│  - Core data loading & parsing.          │    │  - Reasoning gen.  │
-└──────────────────────────────────────────┘    └────────────────────┘
+                         ▼                            ▼
+┌──────────────────────────────────────────┐    ┌──────────────────┐
+│        BACKEND (vanshika-backend)        │    │  REFINER (swapna)│
+│  - Candidate ingestion (JSON/JSONL).     │    │  - TF-IDF & Cosine
+│  - Profile Completeness calculations.    │    │    Similarity.   │
+│  - Anomaly & Honeypot detection scoring. │    │  - Weighted rank.│
+│  - Core data loading & parsing.          │    │  - Reasoning gen.│
+└──────────────────────────────────────────┘    └──────────────────┘
 ```
 
 ### 1. Frontend (`harsh-ui`)
@@ -90,10 +90,10 @@ Responsible for loading the raw database and computing safety/trust scores:
 Bridges backend parsing and frontend search queries:
 * **Vectorization (`ranking.py`):** Fits a TF-IDF vectorizer over the corpus of cleaned text and transforms search terms.
 * **Matching:** Evaluates cosine similarity of vectors to find true conceptual relevance.
-* **Adjustment & Alignment:** Combines semantic similarity (70% weight) and behavioral engagement (30% weight), scaling the final composite score to the `[0.0, 1.0]` range with 4 decimal places for chart display.
+* **Adjustment & Alignment:** Combines semantic similarity (70% weight) and behavioral engagement (30% weight), scaling the final composite score to the `[0.0, 1.0]` range with 4 decimal places for precision.
 * **Search Performance Optimization (TF-IDF Caching & Lazy Reasoning):**
-  - **TF-IDF Caching**: Pre-fits the vectorizer and pre-calculates the candidate TF-IDF matrix once on startup. Subsequent search requests reuse the cached state, executing query transformations and similarity computation in milliseconds.
-  - **Lazy Reasoning**: Postpones expensive regex skill matching and reasoning string generation, executing them *only* on the top 100 ranked candidates rather than all 100,000, bringing query processing from ~10s to <500ms.
+  - **TF-IDF Caching**: Pre-fits the vectorizer and pre-calculates the candidate TF-IDF matrix once on startup. Subsequent search requests reuse the cached state, executing query transformations at sub-100ms latency.
+  - **Lazy Reasoning**: Postpones expensive regex skill matching and reasoning string generation, executing them *only* on the top 100 ranked candidates rather than all 100,000, bringing query processing down from 30s+ to under 2s.
   - **Startup Warmup**: Runs a dummy warmup search query during server initialization to pre-load and cache vectorizer states, eliminating cold-start latency.
 
 ---
